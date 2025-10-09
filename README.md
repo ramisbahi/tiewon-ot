@@ -54,32 +54,32 @@ print(p_ot)
 
 ```mermaid
 graph TD
-  A[CLI / API input\nLiveState] --> B[Simulator\nsimulate_overtime_prob / parallel]
+  A[CLI / API input<br/>LiveState] --> B[Simulator<br/>simulate_overtime_prob / parallel]
   B --> C{Monte Carlo loop}
-  C -->|draw next event| D[DriveModel\nEPDrivenDriveModel]
+  C -->|draw next event| D[DriveModel<br/>EPDrivenDriveModel]
   D -->|event informs| E[ClockModel<br/>EmpiricalClockModel<br/>advance_seconds]
   C -->|advance clock| E
-  D -->|FG_ATT| F[FieldGoalModel\nR fastrmodels fg_model or Precomputed\nlate-Q4 distance sampling when in range]
-  D -->|TD| G1[Add 6 points\nset pat_pending]
-  G1 --> G[PAT Decision\nInline heuristic football rules]
-  G -->|2-pt attempt| H[TwoPtSuccess\nPrecomputed two_point_table.parquet - default\nR cp_model fallback]
+  D -->|FG_ATT| F[FieldGoalModel<br/>R fastrmodels fg_model or Precomputed<br/>late-Q4 distance sampling when in range]
+  D -->|TD| G1[Add 6 points<br/>set pat_pending]
+  G1 --> G[PAT Decision<br/>Inline heuristic football rules]
+  G -->|2-pt attempt| H[TwoPtSuccess<br/>Precomputed two_point_table.parquet default<br/>R cp_model fallback]
   G -->|XP attempt| F2[XP via FG model at 33 yd]
   H --> G2[apply result; clear pat_pending]
   F2 --> G2
   G2 --> D2[Kickoff / possession flip]
   E --> I[data/clock_table.json]
-  D --> J[EP Provider\nR nflfastR calculate_expected_points\n(or Precomputed ep_table.parquet)]
+  D --> J[EP Provider<br/>R nflfastR calculate_expected_points<br/>Precomputed ep_table.parquet]
   C -->|stop when 0:00| K{final diff == 0?}
   K -->|yes| L[record 1]
   K -->|no| M[record 0]
-  L --> N[P(OT) = mean(records)]
+  L --> N[P(OT) = mean records]
   M --> N
 
   subgraph Config / Policies
     O[RuleEra]
     P[Workers / seeds]
-    Q[--precomputed, --progress]
-    R[Late-Q4 tuning (non-tie modest boosts)]
+    Q[precomputed, progress flags]
+    R[Late-Q4 tuning non-tie modest boosts]
     S[Diagnostics: late_game_metrics.csv]
   end
 
