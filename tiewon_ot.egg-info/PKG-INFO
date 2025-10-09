@@ -1,0 +1,85 @@
+Metadata-Version: 2.4
+Name: tiewon-ot
+Version: 0.1.0
+Summary: Live NFL regulation simulation for probability of overtime (P(OT)).
+Author: Ramis B.
+License: MIT
+Keywords: NFL,overtime,simulation,win probability,sports analytics
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Topic :: Scientific/Engineering :: Information Analysis
+Requires-Python: >=3.10
+Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.24
+Requires-Dist: pandas>=2.0
+Requires-Dist: pydantic>=2.7
+Requires-Dist: scikit-learn>=1.3
+Requires-Dist: scipy>=1.10
+Provides-Extra: extras
+Requires-Dist: xgboost>=2.0; extra == "extras"
+Requires-Dist: lightgbm>=4.0; extra == "extras"
+
+# tiewon-ot
+
+Accurate live probability of overtime (P(OT)) for NFL games via regulation simulation.
+
+## What it does
+
+- Defines a live game state (score/time/possession/downs/TOs/yardline/team strength)
+- Reuses existing models where possible (fg_model, ep_model from fastrmodels)
+- Runs a Monte Carlo simulation of the rest of regulation and estimates P(OT)
+- Provides a CLI and Python API; optional calibration and late-game shrinkage
+
+## Install
+
+```bash
+pip install -e .
+# Optional for R adapters
+pip install rpy2
+# In R, install fastrmodels
+# install.packages("fastrmodels")
+```
+
+## CLI
+
+```bash
+tiewon-ot --score-diff -3 --quarter 4 --clock 120 --possession home --down 3 --distance 6 --yardline 42 --home-timeouts 2 --away-timeouts 1 --home-two-pt-available 1 --away-two-pt-available 1 --spread -2.5 --sims 50000 --fg-provider fastr --shrink-naive
+```
+
+## Python API
+
+```python
+from tiewon_ot.api import overtime_probability
+from tiewon_ot.state import LiveState, Possession
+
+state = LiveState(
+    score_diff=-3,  # home - away
+    quarter=4,
+    seconds_remaining=120,
+    possession=Possession.HOME,
+    down=3,
+    distance=6,
+    yardline_own=42,
+    timeouts_home=2,
+    timeouts_away=1,
+    home_two_pt_available=True,
+    away_two_pt_available=True,
+    closing_spread=-2.5,
+)
+
+p_ot = overtime_probability(state, num_simulations=100000, random_seed=1)
+print(p_ot)
+```
+
+## R adapter
+
+- Field goal model: `tiewon_ot.adapters.r_fastr.RFastRFieldGoalModel` wraps `fastrmodels::fg_model` via rpy2.
+- Expected points provider: `tiewon_ot.adapters.r_fastr.RFastREPProvider` wraps `fastrmodels::ep_model`.
+
+You must have R available and `fastrmodels` installed. Python needs `rpy2`.
+
+## Notes
+
+- This repo scaffolds a controllable sim; bring your own historical pbp to calibrate.
+- Era/rule splits and reliability tooling included.
