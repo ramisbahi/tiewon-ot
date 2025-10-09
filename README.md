@@ -57,12 +57,12 @@ graph TD
   A[CLI / API input\nLiveState] --> B[Simulator\nsimulate_overtime_prob / parallel]
   B --> C{Monte Carlo loop}
   C -->|draw next event| D[DriveModel\nEPDrivenDriveModel]
-  D -->|event informs| E[ClockModel\nEmpiricalClockModel\nadvance_seconds(state, rng, event)]
+  D -->|event informs| E[ClockModel<br/>EmpiricalClockModel<br/>advance_seconds]
   C -->|advance clock| E
-  D -->|FG_ATT| F[FieldGoalModel\nR fastrmodels fg_model or Precomputed\n(late-Q4 distance sampling when in range)]
+  D -->|FG_ATT| F[FieldGoalModel\nR fastrmodels fg_model or Precomputed\nlate-Q4 distance sampling when in range]
   D -->|TD| G1[Add 6 points\nset pat_pending]
-  G1 --> G[PAT Decision\nInline heuristic (football rules)]
-  G -->|2-pt attempt| H[TwoPtSuccess\nPrecomputed two_point_table.parquet (default)\n(or R cp_model fallback)]
+  G1 --> G[PAT Decision\nInline heuristic football rules]
+  G -->|2-pt attempt| H[TwoPtSuccess\nPrecomputed two_point_table.parquet - default\nR cp_model fallback]
   G -->|XP attempt| F2[XP via FG model at 33 yd]
   H --> G2[apply result; clear pat_pending]
   F2 --> G2
