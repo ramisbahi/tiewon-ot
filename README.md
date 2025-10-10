@@ -72,7 +72,7 @@ graph TD
   C -->|stop when 0:00| K{final diff == 0?}
   K -->|yes| L[record 1]
   K -->|no| M[record 0]
-  L --> N[P(OT) = mean records]
+  L --> N[P(OT): mean of records]
   M --> N
 
   subgraph Config / Policies
