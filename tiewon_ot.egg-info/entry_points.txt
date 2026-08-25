@@ -1,2 +1,0 @@
-[console_scripts]
-tiewon-ot = tiewon_ot.cli:main

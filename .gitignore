@@ -1,12 +1,18 @@
-/.DS_Store
-/.pytest_cache
-/.venv
-/data
-/diagnostics_out
-/diagnostics_out_full
-/diagnostics_out_rebalanced
-/diagnostics_out_rebalanced2
-/diagnostics_out_rebalanced3
-/play_by_play_2018.csv
-/play_by_play_2019.csv
-/play_by_play_2021.csv
+.DS_Store
+.pytest_cache/
+__pycache__/
+*.py[cod]
+
+# Raw training data stays local; the deployed model is committed instead.
+data/
+
+# Web build and local tooling
+web/node_modules/
+web/.next/
+web/dist/
+web/.wrangler/
+web/.env*
+
+# Local Python environments and generated diagnostics
+.venv/
+diagnostics_out*/

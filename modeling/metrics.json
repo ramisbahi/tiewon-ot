@@ -1,0 +1,45 @@
+{
+  "validation": "Five-fold, game-grouped out-of-fold validation",
+  "data": {
+    "games": 1217,
+    "overtime_games": 76,
+    "regulation_overtime_rate": 0.062448644207066556,
+    "final_ties": 4,
+    "conditional_final_tie_rate": 0.052083333333333336,
+    "snapshots": 87972
+  },
+  "all_game_states": {
+    "tiewon_v2": {
+      "brier": 0.054735070532189414,
+      "log_loss": 0.21063940537562428,
+      "roc_auc": 0.7054211631290076
+    },
+    "legacy_fallback": {
+      "brier": 0.05751687793165655,
+      "log_loss": 0.2245702120990262,
+      "roc_auc": 0.6624983067502352
+    },
+    "constant_baseline": {
+      "brier": 0.05854881104376578,
+      "log_loss": 0.23365256212936,
+      "roc_auc": 0.5
+    }
+  },
+  "final_five_minutes": {
+    "tiewon_v2": {
+      "brier": 0.05471108998920243,
+      "log_loss": 0.18551655322422417,
+      "roc_auc": 0.8845873642130686
+    },
+    "legacy_fallback": {
+      "brier": 0.06446792392513732,
+      "log_loss": 0.22890369263441926,
+      "roc_auc": 0.8071402116044548
+    },
+    "constant_baseline": {
+      "brier": 0.06929323219600654,
+      "log_loss": 0.26614274659658677,
+      "roc_auc": 0.5
+    }
+  }
+}
