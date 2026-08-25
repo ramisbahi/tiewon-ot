@@ -16,7 +16,6 @@ interface ExportedModel {
   learningRate: number;
   trees: ExportedTree[];
   calibration: { x: number[]; y: number[] };
-  conditionalFinalTieRate: number;
   trainingSummary: {
     games: number;
     overtimeGames: number;
@@ -48,7 +47,7 @@ function interpolate(value: number, x: number[], y: number[]) {
   return y[low] + weight * (y[high] - y[low]);
 }
 
-function featuresForState(state: GameState) {
+export function featuresForState(state: GameState) {
   const secondsRemaining = clamp((4 - state.quarter) * 900 + state.clockSeconds, 0, 3600);
   const homeDiff = state.homeScore - state.awayScore;
   const scoreDiffOffense = clamp(state.possession === 'home' ? homeDiff : -homeDiff, -28, 28);
@@ -62,6 +61,9 @@ function featuresForState(state: GameState) {
     fourth_quarter: state.quarter === 4 ? 1 : 0,
     final_two_minutes: secondsRemaining <= 120 ? 1 : 0,
     score_diff_offense: scoreDiffOffense,
+    home_score_diff: clamp(homeDiff, -28, 28),
+    home_leads: homeDiff > 0 ? 1 : 0,
+    home_trails: homeDiff < 0 ? 1 : 0,
     absolute_score_diff: absoluteScoreDiff,
     is_tied: scoreDiffOffense === 0 ? 1 : 0,
     one_score_game: absoluteScoreDiff <= 8 ? 1 : 0,
@@ -90,7 +92,7 @@ function evaluateTree(tree: ExportedTree, features: number[]) {
   return tree.value[node];
 }
 
-export function predictRegulationTie(state: GameState) {
+function predictScrimmageTie(state: GameState) {
   if (state.quarter > 4) return 1;
   if (state.quarter === 4 && state.clockSeconds <= 0) {
     return state.homeScore === state.awayScore ? 1 : 0;
@@ -99,19 +101,55 @@ export function predictRegulationTie(state: GameState) {
   let raw = model.baseScore;
   for (const tree of model.trees) raw += model.learningRate * evaluateTree(tree, features);
   const uncalibrated = 1 / (1 + Math.exp(-raw));
-  return clamp(interpolate(uncalibrated, model.calibration.x, model.calibration.y), 0.0005, 0.995);
+  let calibrated = clamp(interpolate(uncalibrated, model.calibration.x, model.calibration.y), 0.0005, 0.995);
+
+  // One- and two-point margins cannot normally be erased by the next score.
+  // The training set contains no overtime outcomes from these margins in the
+  // final two minutes, so keep a small non-zero tail for safeties and unusual
+  // conversion sequences instead of inheriting isotonic calibration's 6.3% floor.
+  const secondsRemaining = clamp((4 - state.quarter) * 900 + state.clockSeconds, 0, 3600);
+  const absoluteScoreDiff = Math.abs(state.homeScore - state.awayScore);
+  if (secondsRemaining <= 120 && (absoluteScoreDiff === 1 || absoluteScoreDiff === 2)) {
+    const geometryCap = 0.0005 + (secondsRemaining / 120) * 0.0045;
+    calibrated = Math.min(calibrated, geometryCap);
+  }
+  return calibrated;
+}
+
+export const TRY_SUCCESS_RATE = {
+  kick: 0.9491,
+  two_point: 0.4811,
+} as const;
+
+function resolveTryState(state: GameState, success: boolean) {
+  const points = success ? (state.tryType === 'kick' ? 1 : 2) : 0;
+  const pendingIsHome = state.pendingTryTeam === 'home';
+  return {
+    ...state,
+    homeScore: state.homeScore + (pendingIsHome ? points : 0),
+    awayScore: state.awayScore + (pendingIsHome ? 0 : points),
+    possession: (pendingIsHome ? 'away' : 'home') as GameState['possession'],
+    phase: 'scrimmage' as const,
+    down: 1,
+    distance: 10,
+    yardlineOwn: 25,
+  };
+}
+
+export function predictRegulationTie(state: GameState) {
+  if (state.phase !== 'pending_try') return predictScrimmageTie(state);
+  const successRate = TRY_SUCCESS_RATE[state.tryType];
+  const onSuccess = predictScrimmageTie(resolveTryState(state, true));
+  const onFailure = predictScrimmageTie(resolveTryState(state, false));
+  return successRate * onSuccess + (1 - successRate) * onFailure;
 }
 
 export function forecast(state: GameState) {
   const regulationTie = predictRegulationTie(state);
-  const finalDraw = state.seasonType === 'postseason'
-    ? 0
-    : regulationTie * model.conditionalFinalTieRate;
-  return { regulationTie, finalDraw };
+  return { regulationTie };
 }
 
 export const modelSummary = {
   version: model.version,
   ...model.trainingSummary,
-  conditionalFinalTieRate: model.conditionalFinalTieRate,
 };

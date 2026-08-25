@@ -2,7 +2,15 @@
 
 TieWon is a live NFL dashboard for one question: **what is the probability that the score is tied when regulation ends?**
 
-The site polls the ESPN public scoreboard during games and scores every state in the browser with a calibrated gradient-boosted model. When no games are live, the same model powers an editable scenario lab and an automated two-minute-drive playback.
+The site polls the ESPN public scoreboard during games and scores every state in the browser. When no games are live, an editable scenario lab can play forward any preset or custom state.
+
+The simulator shows two independent views:
+
+- a calibrated binary model specialized for the probability regulation ends tied;
+- a separately validated three-way model for away ahead / tied / home ahead; and
+- a 10,000-run Monte Carlo check fitted to 26,352 historical drives, including a rule-aware final win/loss/tie result.
+
+Pending extra points and two-point tries are explicit states. Overtime can use the legacy regular-season format, the 2025+ both-teams-possession format, or postseason rules.
 
 ## Run the website
 
@@ -21,6 +29,15 @@ cd web
 npm run build
 ```
 
+## Tests
+
+```bash
+cd web
+npm test
+```
+
+The regression suite covers pending tries, score geometry, end-of-regulation boundaries, every custom-state playback path, normalized three-way outcomes, deterministic simulation, and postseason no-draw behavior.
+
 ## Retrain the model
 
 Place nflverse `play_by_play_YYYY.csv` files in `data/`, then run:
@@ -29,7 +46,7 @@ Place nflverse `play_by_play_YYYY.csv` files in `data/`, then run:
 python modeling/train_model.py
 ```
 
-The trainer:
+The tie trainer:
 
 - creates one representative snapshot per game-minute plus every valid snap in the final five minutes;
 - gives each game equal total weight;
@@ -37,6 +54,8 @@ The trainer:
 - validates with five folds grouped by game to prevent state leakage;
 - calibrates probabilities with isotonic regression; and
 - exports a compact tree ensemble to `web/lib/model-data.json` for browser inference.
+
+`modeling/train_outcome_model.py` fits the separate three-way regulation model. `modeling/train_simulator.py` extracts empirical outcome and duration distributions from historical drives for Monte Carlo.
 
 ## Current model
 

@@ -7,9 +7,9 @@ The original project was not a deployable probability product. It was a research
 TieWon v2 reduces the system to:
 
 1. a reproducible offline training pipeline;
-2. a compact calibrated model that runs in the browser;
+2. compact calibrated tie-specific and three-way outcome models that run in the browser;
 3. a live scoreboard adapter; and
-4. one responsive website with a built-in scenario simulator.
+4. one responsive website with a preset/custom scenario simulator and empirical Monte Carlo cross-check.
 
 ## Model audit
 
@@ -23,6 +23,9 @@ TieWon v2 reduces the system to:
 | The fallback injected random variation into the same state. | Refreshing the page could change the answer without a play occurring. | Inference is deterministic for a given state. |
 | The UI showed `P(OT) × 0.07` as “tie probability.” | It mixed two different events: regulation ending tied and overtime also ending tied. | The primary metric is explicitly “Tied at 0:00.” A separate “Final draw” estimate is shown for regular-season games. |
 | The closing spread and “use spread prior” configuration existed but did not affect the simulator. | The interface implied information the model ignored. | Unsupported inputs were removed. |
+| Touchdowns were treated like ordinary scrimmage states. | A one-point margin is completely different when an extra point is still pending. | Pending kick and two-point tries are explicit states and are resolved before normal inference or simulation. |
+| Isotonic calibration imposed a 6.3% floor on some late one-point leads. | It violated basic football score geometry; no included final-two-minute state at a one- or two-point margin reached overtime. | A tested, non-zero geometry cap preserves rare safety/conversion paths while preventing implausible late probabilities. |
+| Scenario playback always reset to the first demo. | Other presets and custom inputs were cosmetic. | A deterministic current-state play engine advances whichever preset or custom scenario is selected. |
 
 ## Application audit
 
@@ -38,7 +41,7 @@ Problems removed:
 - Generated Python bytecode and package metadata were committed.
 - There was no useful experience when games were not live.
 
-The rebuilt website has one runtime, one page, one live data adapter, no database, and no server-side model compute. The live board polls every 15 seconds. If there are no live events—or the feed is unavailable—the product remains fully usable in demo and simulator modes.
+The rebuilt website has one runtime, one page, one live data adapter, no database, and no server-side model compute. The live board polls every 15 seconds. If there are no live events—or the feed is unavailable—the product remains fully usable in demo and simulator modes. The Monte Carlo engine resamples outcome and clock distributions fitted from 26,352 drives and yields between batches so the interface remains responsive.
 
 ## Validation
 
@@ -53,12 +56,15 @@ The model was evaluated with five-fold out-of-fold validation grouped by game. G
 
 The largest improvement is in the final five minutes: roughly 15% lower Brier error than the legacy fallback.
 
+The separate three-way classifier was validated on the same game-grouped folds. It reaches 72.2% weighted accuracy overall and 84.0% in the final five minutes, with multiclass log loss of 0.626 overall and 0.401 late. Its late tie Brier score (0.0552) is slightly worse than the binary specialist (0.0547), so the product keeps the binary model as the headline tie estimate and uses the three-way model only for the regulation outcome split.
+
 ## Remaining limitations
 
 - The model uses game state, not current player injuries, weather, kicker identity, or team-strength ratings.
 - ESPN's public scoreboard endpoint has no product-level service guarantee; the site degrades to demo mode if it is unavailable.
-- “Final draw” is an empirical conditional estimate based on a small number of overtime ties. It is secondary by design.
-- The 2025 regular-season overtime rule changed to guarantee both teams an opportunity to possess the ball, subject to the 10-minute limit. The regulation-tie model is unaffected, but the final-draw estimate should be revisited as more games accumulate under the new rule.
+- The historical classifiers stop at 0:00 in regulation, so their labels are invariant to the overtime rules in effect that season.
+- Final win/loss/tie results come from a separate rule-aware simulation: legacy regular season through 2024, both teams guaranteed an opportunity in a 10-minute regular-season period from 2025 onward, and no draw in postseason.
+- Monte Carlo disagreement is intentionally visible. Its confidence interval covers finite sampling error, not transition-model misspecification, team strength, injuries, or weather.
 - Probabilities should be recalibrated after each season and monitored for rule or data-feed changes.
 
 ## Recommended next model iteration

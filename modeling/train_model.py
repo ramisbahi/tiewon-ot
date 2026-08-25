@@ -27,6 +27,9 @@ FEATURE_NAMES = [
     "fourth_quarter",
     "final_two_minutes",
     "score_diff_offense",
+    "home_score_diff",
+    "home_leads",
+    "home_trails",
     "absolute_score_diff",
     "is_tied",
     "one_score_game",
@@ -42,6 +45,7 @@ FEATURE_NAMES = [
     "home_possession",
     "time_score_pressure",
 ]
+BINARY_FEATURE_NAMES = [name for name in FEATURE_NAMES if name not in {"home_score_diff", "home_leads", "home_trails"}]
 
 READ_COLUMNS = [
     "game_id",
@@ -141,7 +145,7 @@ def load_snapshots(data_dir: Path) -> tuple[pd.DataFrame, dict[str, float]]:
     return snapshots, stats
 
 
-def feature_matrix(frame: pd.DataFrame) -> np.ndarray:
+def feature_matrix(frame: pd.DataFrame, feature_names: list[str] = FEATURE_NAMES) -> np.ndarray:
     seconds = frame.game_seconds_remaining.clip(0, 3600).astype(float)
     diff = frame.score_differential.clip(-28, 28).astype(float)
     abs_diff = diff.abs()
@@ -151,6 +155,7 @@ def feature_matrix(frame: pd.DataFrame) -> np.ndarray:
     offense_timeouts = frame.posteam_timeouts_remaining.fillna(3).clip(0, 3).astype(float)
     defense_timeouts = frame.defteam_timeouts_remaining.fillna(3).clip(0, 3).astype(float)
     home_possession = (frame.posteam == frame.home_team).astype(float)
+    home_diff = np.where(home_possession == 1, diff, -diff)
 
     values = {
         "seconds_remaining": seconds,
@@ -158,6 +163,9 @@ def feature_matrix(frame: pd.DataFrame) -> np.ndarray:
         "fourth_quarter": (frame.qtr == 4).astype(float),
         "final_two_minutes": (seconds <= 120).astype(float),
         "score_diff_offense": diff,
+        "home_score_diff": home_diff,
+        "home_leads": (home_diff > 0).astype(float),
+        "home_trails": (home_diff < 0).astype(float),
         "absolute_score_diff": abs_diff,
         "is_tied": (diff == 0).astype(float),
         "one_score_game": (abs_diff <= 8).astype(float),
@@ -173,7 +181,7 @@ def feature_matrix(frame: pd.DataFrame) -> np.ndarray:
         "home_possession": home_possession,
         "time_score_pressure": abs_diff / np.sqrt(seconds + 30.0),
     }
-    return np.column_stack([values[name] for name in FEATURE_NAMES])
+    return np.column_stack([values[name] for name in feature_names])
 
 
 def build_classifier(seed: int) -> GradientBoostingClassifier:
@@ -219,7 +227,7 @@ def serialize_tree(estimator) -> dict:
 
 def train_and_export(data_dir: Path, output_path: Path, metrics_path: Path) -> None:
     frame, data_stats = load_snapshots(data_dir)
-    X = feature_matrix(frame)
+    X = feature_matrix(frame, BINARY_FEATURE_NAMES)
     y = frame.reached_overtime.to_numpy(int)
     weights = frame.sample_weight.to_numpy(float)
     groups = frame.game_id.astype(str).to_numpy()
@@ -289,7 +297,7 @@ def train_and_export(data_dir: Path, output_path: Path, metrics_path: Path) -> N
         "version": "2.0.0",
         "target": "Probability the score is tied at the end of regulation",
         "trainedSeasons": sorted(int(v) for v in frame.season.dropna().unique()),
-        "featureNames": FEATURE_NAMES,
+        "featureNames": BINARY_FEATURE_NAMES,
         "baseScore": base_score,
         "learningRate": float(final_model.learning_rate),
         "trees": [serialize_tree(tree[0]) for tree in final_model.estimators_],

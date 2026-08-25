@@ -1,0 +1,17 @@
+{
+  "validation": "Five-fold, game-grouped out-of-fold validation",
+  "games": 1217,
+  "snapshots": 87972,
+  "all_states": {
+    "multiclass_log_loss": 0.6255984966299042,
+    "accuracy": 0.7223031827527584,
+    "tie_brier": 0.0548629860799507,
+    "tie_auc": 0.7081439964666824
+  },
+  "final_five_minutes": {
+    "multiclass_log_loss": 0.4011528734649309,
+    "accuracy": 0.8401093488405793,
+    "tie_brier": 0.05524880341117223,
+    "tie_auc": 0.8828992205067809
+  }
+}

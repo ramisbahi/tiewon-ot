@@ -6,9 +6,9 @@ const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000'),
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://tiewon.sbahirami.chatgpt.site'),
   title: 'TieWon — Live NFL tie probability',
-  description: 'Live, play-by-play probability that an NFL game reaches overtime, plus an interactive scenario simulator.',
+  description: 'Live NFL regulation outcomes from calibrated models and a rule-aware Monte Carlo simulator.',
   openGraph: {
     title: 'TieWon — Live NFL tie probability',
     description: 'Every snap changes the shape of overtime.',

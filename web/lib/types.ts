@@ -1,4 +1,7 @@
 export type Possession = 'home' | 'away';
+export type GamePhase = 'scrimmage' | 'pending_try';
+export type TryType = 'kick' | 'two_point';
+export type OvertimeRules = 'legacy_regular' | 'current_regular' | 'postseason';
 
 export interface GameState {
   id: string;
@@ -10,6 +13,10 @@ export interface GameState {
   clockSeconds: number;
   clockLabel: string;
   possession: Possession;
+  phase: GamePhase;
+  tryType: TryType;
+  pendingTryTeam: Possession;
+  overtimeRules: OvertimeRules;
   down: number;
   distance: number;
   yardlineOwn: number;
@@ -27,4 +34,3 @@ export interface GameFeedResponse {
   fetchedAt: string;
   source: string;
 }
-
