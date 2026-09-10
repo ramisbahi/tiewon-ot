@@ -1,0 +1,18 @@
+services:
+  bot:
+    build:
+      context: .
+      dockerfile: bot/Dockerfile
+    env_file: bot/.env
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    volumes:
+      - bot-state:/app/.bot-state
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  bot-state:

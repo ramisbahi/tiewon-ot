@@ -22,6 +22,12 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+## Live X / Twitter bot
+
+The `bot/` worker powers **@NFL_TieWon** with Q4 regulation-tie probability alerts and confirmed overtime updates, using this same model and feed. It includes dry-run previews, account verification, a persistent SQLite posting ledger, configurable thresholds/budgets, and Docker Compose deployment.
+
+See [bot/README.md](bot/README.md) for credentials, verification, launch, and recovery. The website deployment does not automatically start the bot.
+
 ## Production build
 
 ```bash

@@ -1,0 +1,11 @@
+.git
+**/node_modules
+**/.env
+**/.env.*
+**/.bot-state
+**/.sites-runtime
+**/dist
+**/.next
+**/.wrangler
+data
+.venv

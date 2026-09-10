@@ -9,7 +9,13 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "start": "vinext start",
-    "test": "tsx --test tests/*.test.ts",
+    "test": "node --import tsx --test tests/*.test.ts ../bot/tests/*.test.ts",
+    "bot": "node --env-file-if-exists=../bot/.env --import tsx ../bot/run.ts",
+    "bot:once": "npm run bot -- --once",
+    "bot:check-auth": "npm run bot -- --check-auth",
+    "bot:test-post": "npm run bot -- --test-post",
+    "bot:status": "npm run bot -- --status",
+    "bot:resolve": "npm run bot -- --resolve",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
   },
   "dependencies": {
