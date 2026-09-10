@@ -72,10 +72,11 @@ export class XClient {
     return result.data.username as string;
   }
 
-  async post(text: string) {
+  async post(text: string, replyTo?: string) {
     // Bot templates are deliberately ASCII and URL-free, so this is also X's weighted length.
     if (!/^[\x20-\x7e\n]+$/.test(text) || text.length > 280) throw new Error('Invalid bot post text');
-    const result = await this.call('POST', '/2/tweets', { text });
+    if (replyTo && !/^\d+$/.test(replyTo)) throw new Error('Invalid reply post ID');
+    const result = await this.call('POST', '/2/tweets', { text, ...(replyTo ? { reply: { in_reply_to_tweet_id: replyTo } } : {}) });
     if (typeof result?.data?.id !== 'string') throw new Error('X returned no post ID; delivery may be uncertain');
     return result.data.id as string;
   }

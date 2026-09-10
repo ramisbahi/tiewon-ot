@@ -1,3 +1,5 @@
+> September 10, 2026 update: the live board now headlines **chance of a final tie**, with **chance of overtime** alongside it. The wording and behavior below describe the earlier audit. See `ESPN_VERIFICATION.md` for the new live-OT model and its limitations.
+
 # TieWon rebuild audit
 
 ## Executive finding

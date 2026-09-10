@@ -1,4 +1,5 @@
-import type { GameState } from '../web/lib/types';
+import type { BotGame } from './types';
+import { liveProbabilities, type Probabilities } from '../web/lib/live-probabilities';
 import type { BotConfig } from './config';
 import { nextPost, type Post } from './policy';
 import { Store } from './store';
@@ -9,10 +10,10 @@ export const CONNECTION_TEST: Post = {
   text: 'TieWon bot connection test. This is a test post, not a live game prediction. #TieWon',
 };
 
-export async function publishPost(candidate: Post, store: Store, config: BotConfig, post: (text: string) => Promise<string>, now = Date.now(), log: (message: string) => void = console.log) {
+export async function publishPost(candidate: Post, store: Store, config: BotConfig, post: (text: string, replyTo?: string) => Promise<string>, now = Date.now(), log: (message: string) => void = console.log) {
   if (!store.claim(candidate, config, now)) return false;
   try {
-    const id = config.live ? await post(candidate.text) : `dry-run:${candidate.key}`;
+    const id = config.live ? await post(candidate.text, candidate.replyTo) : `dry-run:${candidate.key}`;
     store.sent(candidate.key, id);
     log(JSON.stringify({ event: config.live ? 'published' : 'dry-run', key: candidate.key, id, text: candidate.text }));
     return true;
@@ -31,15 +32,20 @@ export async function publishPost(candidate: Post, store: Store, config: BotConf
   }
 }
 
-export async function publishGames(games: GameState[], store: Store, config: BotConfig, post: (text: string) => Promise<string>, now = Date.now(), log: (message: string) => void = console.log) {
+export async function publishGames(games: BotGame[], store: Store, config: BotConfig, post: (text: string, replyTo?: string) => Promise<string>, now = Date.now(), log: (message: string) => void = console.log, predict: (game: BotGame) => Probabilities = game => liveProbabilities(game, config.overtimeRuns)) {
   let published = 0;
   let attempts = 0;
+  const candidates = games.flatMap(game => {
+    const probabilities = predict(game);
+    store.observe(game, probabilities, now);
+    const candidate = nextPost(game, store.gameHistory(game.id), game.quarter > 4 ? probabilities.finalTie : probabilities.overtime);
+    return candidate ? [candidate] : [];
+  });
+  const priority = (p: Post) => p.kind === 'overtime' ? 0 : p.kind === 'final' ? 1 : p.kind === 'ot_threshold' ? 2 : 3;
   // Resolve actual outcomes before spending the daily budget on forecasts.
-  for (const game of [...games].sort((a, b) => Number(b.quarter > 4 || !b.isLive) - Number(a.quarter > 4 || !a.isLive))) {
+  for (const candidate of candidates.sort((a, b) => priority(a) - priority(b))) {
     // At most three 15-second requests per snapshot; remaining games get a fresh poll.
     if (store.blocked(now) || attempts >= 3) break;
-    const candidate = nextPost(game, store.previous(game.id), store.count(game.id), config, now);
-    if (!candidate) continue;
     if (await publishPost(candidate, store, config, post, now, log)) {
       attempts++;
       published++;

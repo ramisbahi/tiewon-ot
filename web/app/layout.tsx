@@ -8,7 +8,7 @@ const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin']
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || 'https://tiewon.sbahirami.chatgpt.site'),
   title: 'TieWon — Live NFL tie probability',
-  description: 'Live NFL regulation outcomes from calibrated models and a rule-aware Monte Carlo simulator.',
+  description: 'Live NFL final-tie and overtime probabilities, with saved game histories and a scenario simulator.',
   openGraph: {
     title: 'TieWon — Live NFL tie probability',
     description: 'Every snap changes the shape of overtime.',

@@ -1,14 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { forecast, modelSummary } from '@/lib/model';
 import { predictRegulationOutcomes } from '@/lib/outcome-model';
 import { simulateTieProbabilityAsync, simulationSummary, type SimulationResult } from '@/lib/monte-carlo';
 import { simulateNextPlay } from '@/lib/simulator';
-import { ESPN_SCOREBOARD_URL, parseScoreboard } from '@/lib/espn';
+import { liveProbabilities, type Probabilities } from '@/lib/live-probabilities';
+import type { BotGame } from '@/lib/live-types';
+import ProbabilityHistory from './ProbabilityHistory';
 import type { GamePhase, GameState, OvertimeRules, Possession, TryType } from '@/lib/types';
 
 const KICKOFF_RATE = modelSummary.overtimeGames / modelSummary.games;
+interface BoardEntry { game: BotGame; probabilities: Probabilities; updatedAt: number }
 
 const BASE_DEMO: GameState = {
   id: 'demo-two-minute', awayTeam: 'MIN', homeTeam: 'GB', awayScore: 24, homeScore: 24,
@@ -46,58 +49,68 @@ function quarterLabel(quarter: number) { return quarter > 4 ? 'OT' : `Q${quarter
 function possessionTeam(state: GameState) { return state.possession === 'home' ? state.homeTeam : state.awayTeam; }
 function probabilityBand(value: number) { return value >= 0.4 ? 'hot' : value >= 0.16 ? 'warm' : 'cool'; }
 
-function GameCard({ state, event, compact = false }: { state: GameState; event?: string; compact?: boolean }) {
-  const prediction = forecast(state);
-  const band = probabilityBand(prediction.regulationTie);
+function GameCard({ state, event, compact = false, probabilities }: { state: BotGame; event?: string; compact?: boolean; probabilities?: Probabilities }) {
+  const prediction = probabilities ?? liveProbabilities(state);
+  const band = probabilityBand(prediction.finalTie ?? 0);
+  const isDemo = state.source === 'demo';
+  const finished = !state.isLive && !isDemo;
   const ballLeft = Math.min(97, Math.max(3, state.yardlineOwn));
-  const kickoffMultiple = prediction.regulationTie / KICKOFF_RATE;
   return (
     <article className={`game-card ${compact ? 'compact-card' : ''}`}>
       <div className="game-topline">
-        <span className={state.isLive ? 'live-pill' : 'demo-pill'}><span className={state.isLive ? 'pulse-dot' : ''} />{state.isLive ? 'Live' : 'Scenario playback'}</span>
-        <span>{quarterLabel(state.quarter)} · {state.clockLabel}</span>
+        <span className={state.isLive ? 'live-pill' : 'demo-pill'}><span className={state.isLive ? 'pulse-dot' : ''} />{state.isLive ? 'Live' : isDemo ? 'Scenario playback' : 'Final'}</span>
+        <span>{finished ? `Final${state.quarter > 4 ? ' / OT' : ''}` : `${quarterLabel(state.quarter)} · ${state.clockLabel}`}</span>
       </div>
       <div className="game-grid">
         <div className="matchup">
           <div className={`team-row ${state.possession === 'away' ? 'has-ball' : ''}`}><span className="team-code">{state.awayTeam}</span><strong>{state.awayScore}</strong></div>
           <div className={`team-row ${state.possession === 'home' ? 'has-ball' : ''}`}><span className="team-code">{state.homeTeam}</span><strong>{state.homeScore}</strong></div>
-          <div className="possession-line">{state.phase === 'pending_try'
+          <div className="possession-line">{finished ? (state.homeScore === state.awayScore ? 'Game ended tied' : `${state.homeScore > state.awayScore ? state.homeTeam : state.awayTeam} wins`) : state.fieldStateReliable === false ? 'Waiting for complete field data' : state.phase === 'pending_try'
             ? `${state.pendingTryTeam === 'home' ? state.homeTeam : state.awayTeam} · ${state.tryType === 'kick' ? 'extra point' : 'two-point try'} pending`
             : `${possessionTeam(state)} ball · ${state.down}${state.down === 1 ? 'st' : state.down === 2 ? 'nd' : state.down === 3 ? 'rd' : 'th'} & ${state.distance} · own ${state.yardlineOwn}`}</div>
           {event && <div className="event-line">{event}</div>}
         </div>
         <div className={`probability-block ${band}`}>
-          <span className="probability-label">Tied at 0:00</span>
-          <strong className="probability-value">{percent(prediction.regulationTie)}</strong>
-          <span className="probability-caption">Chance regulation ends level</span>
+          <span className="probability-label">{finished ? 'Final tie outcome' : 'Chance of a final tie'}</span>
+          <strong className="probability-value">{prediction.finalTie == null ? '—' : percent(prediction.finalTie)}</strong>
+          <span className="probability-caption">{finished ? 'Confirmed result' : state.seasonType === 'postseason' ? 'Postseason games cannot end tied' : 'Game ends tied after overtime'}</span>
         </div>
         <div className="signal-panel">
           <div><span>OT format</span><strong>{state.overtimeRules === 'current_regular' ? '2025+' : state.overtimeRules === 'legacy_regular' ? 'Legacy' : 'Playoffs'}</strong></div>
-          <div><span>Vs. kickoff</span><strong>{kickoffMultiple.toFixed(1)}×</strong></div>
-          <div><span>Feed</span><strong>{state.isLive ? 'Live' : 'Demo'}</strong></div>
+          <div className="ot-secondary"><span>{finished ? 'Reached overtime' : 'Chance of overtime'}</span><strong>{prediction.overtime == null ? '—' : percent(prediction.overtime)}</strong></div>
+          <div><span>Feed</span><strong>{state.isLive ? 'Live' : isDemo ? 'Demo' : 'Final'}</strong></div>
         </div>
       </div>
-      <div className="field-strip" aria-label={`Ball on the ${possessionTeam(state)} ${state.yardlineOwn} yard line`}>
+      {!finished && state.fieldStateReliable !== false && <div className="field-strip" aria-label={`Ball on the ${possessionTeam(state)} ${state.yardlineOwn} yard line`}>
         <span className="endzone">OWN</span><span>20</span><span>40</span><span className="ball" style={{ left: `${ballLeft}%` }} /><span className="midfield">50</span><span>40</span><span>20</span><span className="endzone">OPP</span>
-      </div>
+      </div>}
     </article>
   );
 }
 
 function LiveBoard({ onOpenSimulator }: { onOpenSimulator: () => void }) {
-  const [games, setGames] = useState<GameState[]>([]);
+  const [entries, setEntries] = useState<BoardEntry[]>([]);
+  const [historyError, setHistoryError] = useState(false);
+  const [archiveId, setArchiveId] = useState('');
+  const games = entries.filter(entry => entry.game.isLive && Date.now() - entry.updatedAt < 120000);
+  const archived = entries.filter(entry => !entry.game.isLive);
+  const stale = entries.filter(entry => entry.game.isLive && Date.now() - entry.updatedAt >= 120000);
+  const archive = archived.find(entry => entry.game.id === archiveId) ?? archived[0];
   const [loading, setLoading] = useState(true);
   const [feedError, setFeedError] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [demoIndex, setDemoIndex] = useState(0);
   const [demoPlaying, setDemoPlaying] = useState(true);
+  const loadingFeed = useRef(false);
   const loadGames = useCallback(async () => {
+    if (loadingFeed.current) return;
+    loadingFeed.current = true;
     try {
-      const response = await fetch(ESPN_SCOREBOARD_URL, { cache: 'no-store' });
+      const response = await fetch('/api/board', { cache: 'no-store', signal: AbortSignal.timeout(35000) });
       if (!response.ok) throw new Error('feed');
-      const payload = await response.json();
-      setGames(parseScoreboard(payload)); setLastUpdated(new Date()); setFeedError(false);
-    } catch { setFeedError(true); } finally { setLoading(false); }
+      const payload = await response.json() as { games: BoardEntry[]; feedAvailable: boolean; historyAvailable: boolean };
+      setEntries(payload.games); setLastUpdated(new Date()); setFeedError(!payload.feedAvailable); setHistoryError(!payload.historyAvailable);
+    } catch { setFeedError(true); } finally { setLoading(false); loadingFeed.current = false; }
   }, []);
   useEffect(() => { const initial = window.setTimeout(loadGames, 0); const timer = window.setInterval(loadGames, 15_000); return () => { window.clearTimeout(initial); window.clearInterval(timer); }; }, [loadGames]);
   useEffect(() => {
@@ -106,18 +119,20 @@ function LiveBoard({ onOpenSimulator }: { onOpenSimulator: () => void }) {
     return () => window.clearInterval(timer);
   }, [demoPlaying, games.length]);
   const demo = PLAYBACK[demoIndex];
-  const statusCopy = loading ? 'Checking the live board…' : games.length ? `${games.length} game${games.length === 1 ? '' : 's'} live · refreshes every 15 seconds` : 'No NFL games are live · demo mode is active';
+  const statusCopy = loading ? 'Checking the live board…' : games.length ? `${games.length} game${games.length === 1 ? '' : 's'} live · refreshes every 15 seconds` : archived.length ? 'No games live · explore saved game histories' : 'No live games or saved histories yet';
   return (
     <>
       <section className="feed-status" aria-live="polite">
         <div><span className={games.length ? 'live-dot' : 'idle-dot'} />{statusCopy}</div>
-        <div className="feed-actions">{feedError && <span className="feed-warning">Live feed unavailable</span>}{lastUpdated && <span>Updated {lastUpdated.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}</span>}<button className="text-button" type="button" onClick={loadGames}>Refresh now</button></div>
+        <div className="feed-actions">{feedError && <span className="feed-warning">Live feed unavailable</span>}{historyError && <span className="feed-warning">History storage unavailable</span>}{lastUpdated && <span>Updated {lastUpdated.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}</span>}<button className="text-button" type="button" onClick={loadGames}>Refresh now</button></div>
       </section>
-      <section className="board-heading"><div><p className="section-kicker">{games.length ? 'Live board' : 'Demo feed'}</p><h2>{games.length ? 'Games in progress.' : 'The lab stays open between kickoffs.'}</h2></div><button className="primary-button" type="button" onClick={onOpenSimulator}>Open simulator</button></section>
+      <section className="board-heading"><div><p className="section-kicker">{games.length ? 'Live board' : archived.length ? 'Game archive' : 'Scenario preview'}</p><h2>{games.length ? 'Will anyone win?' : archived.length ? 'Every twist, saved.' : 'The lab stays open between kickoffs.'}</h2></div><button className="primary-button" type="button" onClick={onOpenSimulator}>Open simulator</button></section>
       <div className="game-list">
-        {games.length ? games.map((game) => <GameCard key={game.id} state={game} />) : <><GameCard state={demo.state} event={demo.event} /><div className="demo-controls"><button className="secondary-button" type="button" onClick={() => setDemoPlaying((playing) => !playing)}>{demoPlaying ? 'Pause playback' : 'Resume playback'}</button><div className="playback-steps" aria-label={`Step ${demoIndex + 1} of ${PLAYBACK.length}`}>{PLAYBACK.map((_, index) => <button key={index} aria-label={`Go to demo step ${index + 1}`} className={index === demoIndex ? 'active' : ''} type="button" onClick={() => { setDemoIndex(index); setDemoPlaying(false); }} />)}</div><button className="text-button" type="button" onClick={onOpenSimulator}>Edit this state →</button></div></>}
+        {games.length ? games.map(entry => <div key={entry.game.id}><GameCard state={entry.game} probabilities={entry.probabilities} /><ProbabilityHistory gameId={entry.game.id} live /></div>) : !archived.length && <><GameCard state={demo.state} event={demo.event} /><div className="demo-controls"><button className="secondary-button" type="button" onClick={() => setDemoPlaying((playing) => !playing)}>{demoPlaying ? 'Pause playback' : 'Resume playback'}</button><div className="playback-steps" aria-label={`Step ${demoIndex + 1} of ${PLAYBACK.length}`}>{PLAYBACK.map((_, index) => <button key={index} aria-label={`Go to demo step ${index + 1}`} className={index === demoIndex ? 'active' : ''} type="button" onClick={() => { setDemoIndex(index); setDemoPlaying(false); }} />)}</div><button className="text-button" type="button" onClick={onOpenSimulator}>Edit this state →</button></div></>}
       </div>
-      <section className="method-strip"><div><strong>{modelSummary.games.toLocaleString()}</strong><span>games trained</span></div><div><strong>{modelSummary.snapshots.toLocaleString()}</strong><span>play states</span></div><div><strong>0.885</strong><span>late-game AUC</span></div><p>One calibrated model replaces the old Monte Carlo, R bridges, random fallback, and sportsbook scraper.</p></section>
+      {stale.length > 0 && <p className="history-note" role="status">Updates delayed for {stale.map(entry => `${entry.game.awayTeam} vs ${entry.game.homeTeam}`).join(', ')}. The last state is not a confirmed final.</p>}
+      {archive && <section className="archive-section"><div className="board-heading"><h2>Revisit a game</h2><label>Saved games <select value={archive.game.id} onChange={event => setArchiveId(event.target.value)}>{archived.map(entry => <option key={entry.game.id} value={entry.game.id}>{entry.game.awayTeam} vs {entry.game.homeTeam} · {new Date(entry.game.startTime ?? entry.updatedAt).toLocaleDateString()}</option>)}</select></label></div><GameCard state={archive.game} probabilities={archive.probabilities} /><ProbabilityHistory key={archive.game.id} gameId={archive.game.id} live={false} /></section>}
+      <section className="method-strip"><div><strong>{modelSummary.games.toLocaleString()}</strong><span>games trained</span></div><div><strong>{modelSummary.snapshots.toLocaleString()}</strong><span>play states</span></div><div><strong>0.885</strong><span>late-game AUC</span></div><p>Overtime probability uses a calibrated historical model. Final-tie probability combines it with an overtime drive simulation. Both are estimates, not guarantees.</p></section>
     </>
   );
 }
@@ -206,12 +221,12 @@ function Simulator() {
           </div>
         </div>
         <aside className={`forecast-panel ${probabilityBand(prediction.regulationTie)}`} aria-live="polite">
-          <p className="section-kicker">Two-estimate check</p><span className="forecast-label">Historical model · tied at 0:00</span><strong className="forecast-value">{percent(prediction.regulationTie)}</strong><div className="forecast-meter"><span style={{ width: `${Math.max(1, prediction.regulationTie * 100)}%` }} /></div>
-          <div className="estimate-comparison"><div><span>Monte Carlo · 10,000 futures</span><strong>{simulation ? percent(simulation.estimate) : `Running ${Math.round(simulationProgress * 100)}%`}</strong></div>{simulation && <small>95% interval {percent(simulation.lower)}–{percent(simulation.upper)}</small>}{simulation && disagreement >= 0.05 && <em>Estimates differ by {percent(disagreement)} — treat this state with extra caution.</em>}</div>
-          <div className="outcome-panel"><span>Historical model · regulation</span><div className="outcome-bar"><i style={{ width: `${historicalOutcomes.awayAhead * 100}%` }} /><i style={{ width: `${historicalOutcomes.tied * 100}%` }} /><i style={{ width: `${historicalOutcomes.homeAhead * 100}%` }} /></div><div className="outcome-grid"><div><small>{state.awayTeam} ahead</small><strong>{percent(historicalOutcomes.awayAhead)}</strong></div><div><small>Tied</small><strong>{percent(historicalOutcomes.tied)}</strong></div><div><small>{state.homeTeam} ahead</small><strong>{percent(historicalOutcomes.homeAhead)}</strong></div></div></div>
-          {simulation && <div className="outcome-panel"><span>Monte Carlo regulation outcome</span><div className="outcome-bar" aria-label={`${state.awayTeam} ahead ${percent(simulation.awayAhead)}, tied ${percent(simulation.estimate)}, ${state.homeTeam} ahead ${percent(simulation.homeAhead)}`}><i style={{ width: `${simulation.awayAhead * 100}%` }} /><i style={{ width: `${simulation.estimate * 100}%` }} /><i style={{ width: `${simulation.homeAhead * 100}%` }} /></div><div className="outcome-grid"><div><small>{state.awayTeam} ahead</small><strong>{percent(simulation.awayAhead)}</strong></div><div><small>Tied</small><strong>{percent(simulation.estimate)}</strong></div><div><small>{state.homeTeam} ahead</small><strong>{percent(simulation.homeAhead)}</strong></div></div></div>}
+          <p className="section-kicker">Two-estimate check</p><span className="forecast-label">Chance of overtime · historical model</span><strong className="forecast-value">{percent(prediction.regulationTie)}</strong><div className="forecast-meter"><span style={{ width: `${Math.max(1, prediction.regulationTie * 100)}%` }} /></div>
+          <div className="estimate-comparison"><div><span>Chance of overtime · simulation</span><strong>{simulation ? percent(simulation.estimate) : `Running ${Math.round(simulationProgress * 100)}%`}</strong></div>{simulation && <small>95% interval {percent(simulation.lower)}–{percent(simulation.upper)}</small>}{simulation && disagreement >= 0.05 && <em>Estimates differ by {percent(disagreement)} — treat this state with extra caution.</em>}</div>
+          <div className="outcome-panel"><span>Historical model · OT or a regulation win</span><div className="outcome-bar"><i style={{ width: `${historicalOutcomes.awayAhead * 100}%` }} /><i style={{ width: `${historicalOutcomes.tied * 100}%` }} /><i style={{ width: `${historicalOutcomes.homeAhead * 100}%` }} /></div><div className="outcome-grid"><div><small>{state.awayTeam} wins</small><strong>{percent(historicalOutcomes.awayAhead)}</strong></div><div><small>Overtime</small><strong>{percent(historicalOutcomes.tied)}</strong></div><div><small>{state.homeTeam} wins</small><strong>{percent(historicalOutcomes.homeAhead)}</strong></div></div></div>
+          {simulation && <div className="outcome-panel"><span>Simulation · OT or a regulation win</span><div className="outcome-bar" aria-label={`${state.awayTeam} wins in regulation ${percent(simulation.awayAhead)}, overtime ${percent(simulation.estimate)}, ${state.homeTeam} wins in regulation ${percent(simulation.homeAhead)}`}><i style={{ width: `${simulation.awayAhead * 100}%` }} /><i style={{ width: `${simulation.estimate * 100}%` }} /><i style={{ width: `${simulation.homeAhead * 100}%` }} /></div><div className="outcome-grid"><div><small>{state.awayTeam} wins</small><strong>{percent(simulation.awayAhead)}</strong></div><div><small>Overtime</small><strong>{percent(simulation.estimate)}</strong></div><div><small>{state.homeTeam} wins</small><strong>{percent(simulation.homeAhead)}</strong></div></div></div>}
           {simulation && <div className="outcome-panel final-outcome"><span>Monte Carlo final result · {state.overtimeRules === 'current_regular' ? '2025+ OT' : state.overtimeRules === 'legacy_regular' ? 'legacy OT' : 'postseason OT'}</span><div className="outcome-bar"><i style={{ width: `${simulation.awayWin * 100}%` }} /><i style={{ width: `${simulation.finalDraw * 100}%` }} /><i style={{ width: `${simulation.homeWin * 100}%` }} /></div><div className="outcome-grid"><div><small>{state.awayTeam} win</small><strong>{percent(simulation.awayWin)}</strong></div><div><small>Final tie</small><strong>{percent(simulation.finalDraw)}</strong></div><div><small>{state.homeTeam} win</small><strong>{percent(simulation.homeWin)}</strong></div></div></div>}
-          <div className="forecast-stats"><div><span>Rule-aware final draw</span><strong>{simulation ? percent(simulation.finalDraw) : 'Running'}</strong></div><div><span>Kickoff tie baseline</span><strong>{percent(KICKOFF_RATE)}</strong></div><div><span>Relative tie likelihood</span><strong>{(prediction.regulationTie / KICKOFF_RATE).toFixed(1)}×</strong></div></div>
+          <div className="forecast-stats"><div><span>Chance of a final tie</span><strong>{simulation ? percent(simulation.finalDraw) : 'Running'}</strong></div><div><span>Typical overtime chance</span><strong>{percent(KICKOFF_RATE)}</strong></div><div><span>Relative overtime chance</span><strong>{(prediction.regulationTie / KICKOFF_RATE).toFixed(1)}×</strong></div></div>
           <p className="forecast-note">The historical model is the primary estimate. The simulation independently resamples drive outcomes fitted to {simulationSummary.drives.toLocaleString()} drives; its interval reflects Monte Carlo sampling error, not every source of model uncertainty.</p>
           <div className="playback-event"><span>Scenario event {playIndex}</span><strong>{lastEvent}</strong></div>
         </aside>
@@ -225,7 +240,7 @@ export default function TieWonApp() {
   return (
     <main className="shell" id="top">
       <header className="topbar"><button className="brand brand-button" type="button" onClick={() => setView('live')} aria-label="TieWon home"><span className="brand-mark">TW</span><span>TieWon</span></button><nav className="view-switch" aria-label="Dashboard views"><button className={`view-button ${view === 'live' ? 'active' : ''}`} type="button" onClick={() => setView('live')}>Live board</button><button className={`view-button ${view === 'simulator' ? 'active' : ''}`} type="button" onClick={() => setView('simulator')}>Simulator</button></nav><div className="model-stamp"><span className="live-dot" /> Model v{modelSummary.version.split('.')[0]}</div></header>
-      <section className="hero"><div><p className="eyebrow">Live NFL tie forecast</p><h1>Every snap changes<br />the shape of overtime.</h1></div><p className="hero-copy">A calibrated play-state model trained on five seasons of NFL data. Live on game day, fully explorable whenever the league is quiet.</p></section>
+      <section className="hero"><div><p className="eyebrow">Live NFL tie forecast</p><h1>What if<br />nobody wins?</h1></div><p className="hero-copy">The chance of a final tie, with overtime odds alongside. Follow both through the game, then revisit the saved probability timeline.</p></section>
       {view === 'live' ? <LiveBoard onOpenSimulator={() => setView('simulator')} /> : <Simulator />}
       <footer className="footer-note"><span>Empirical model · 2021–2025 play-by-play · game-grouped validation</span><span>For information and entertainment; not betting advice.</span></footer>
     </main>

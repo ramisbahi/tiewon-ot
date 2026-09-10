@@ -5,6 +5,7 @@ import { credentials, XClient } from './x-client';
 import { botGames, fetchGames } from './feed';
 import { Store } from './store';
 import { CONNECTION_TEST, publishGames, publishPost } from './engine';
+import { syncHistory } from './history-sync';
 
 process.umask(0o077);
 const shutdown = new AbortController();
@@ -22,10 +23,11 @@ async function main() {
     console.log(`Authenticated as @${username}. No post was sent.`);
     return;
   }
+  if (fixtureIndex >= 0) config.database = ':memory:';
   const store = new Store(config.database, config.live ? 'live' : 'dry-run');
   try {
     if (command === '--status') {
-      console.log(JSON.stringify({ mode: config.live ? 'live' : 'dry-run', blocked: store.blocked(Date.now()), pauseUntil: store.setting('pause_until'), posts: store.history() }, null, 2));
+      console.log(JSON.stringify({ mode: config.live ? 'live' : 'dry-run', blocked: store.blocked(Date.now()), pauseUntil: store.setting('pause_until'), posts: store.history(), observations: store.observations() }, null, 2));
       return;
     }
     if (command === '--resolve') {
@@ -37,7 +39,7 @@ async function main() {
     const client = config.live ? new XClient(credentials()) : undefined;
     if (client) await client.verifyAccount(config.username);
     if (command === '--test-post') {
-      const published = await publishPost(CONNECTION_TEST, store, config, (text) => client!.post(text));
+      const published = await publishPost(CONNECTION_TEST, store, config, (text, replyTo) => client!.post(text, replyTo));
       console.log(JSON.stringify({ event: 'connection-test', mode: config.live ? 'live' : 'dry-run', published, blocked: store.blocked(Date.now()) }));
       return;
     }
@@ -58,8 +60,12 @@ async function main() {
         console.error('ESPN unavailable or invalid; no posts sent. Retrying with backoff.');
       }
       if (games) {
-        const published = await publishGames(games, store, config, (text) => client!.post(text), now);
-        console.log(JSON.stringify({ event: 'poll', eligibleGames: games.length, published, blocked: store.blocked(now) }));
+        const published = await publishGames(games, store, config, (text, replyTo) => client!.post(text, replyTo), now);
+        console.log(JSON.stringify({ event: 'poll', trackedGames: games.length, published, blocked: store.blocked(now) }));
+        if (fixtureIndex < 0) {
+          try { await syncHistory(store); }
+          catch { console.error('History sync unavailable; snapshots retained locally for retry.'); }
+        }
       }
       if (once || shutdown.signal.aborted) break;
       const delay = Math.min(900, config.pollSeconds * 2 ** Math.min(failures, 5));

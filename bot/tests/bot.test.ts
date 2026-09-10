@@ -9,7 +9,8 @@ import { botGames, fetchGames } from '../feed';
 import { nextPost } from '../policy';
 import { Store } from '../store';
 import { CONNECTION_TEST, publishGames, publishPost } from '../engine';
-import type { GameState } from '../../web/lib/types';
+import type { BotGame as GameState } from '../types';
+import { EMPTY_HISTORY } from '../types';
 
 const now = Date.now();
 const config = readConfig({});
@@ -20,7 +21,7 @@ function game(overrides: Partial<GameState> = {}): GameState {
     phase: 'scrimmage', tryType: 'kick', pendingTryTeam: 'away', down: 1,
     overtimeRules: 'current_regular', distance: 10, yardlineOwn: 25,
     timeoutsHome: 2, timeoutsAway: 2, status: 'STATUS_IN_PROGRESS', detail: 'Live',
-    isLive: true, seasonType: 'regular', source: 'live', ...overrides,
+    isLive: true, seasonType: 'regular', source: 'live', fieldStateReliable: true, ...overrides,
   };
 }
 function event() {
@@ -81,7 +82,7 @@ test('feed accepts complete states and rejects stale, incomplete, preseason, sus
   ];
   for (const change of changes) {
     const e = event(); change(e);
-    assert.equal(botGames({ events: [e] }, now).length, 0);
+    assert.ok(!botGames({ events: [e] }, now)[0]?.fieldStateReliable);
   }
   assert.throws(() => botGames({ error: 'outage' }), /events missing/);
 });
@@ -104,23 +105,21 @@ test('ESPN cache staleness is rejected and date range spans UTC midnight', async
   assert.match(requested, /dates=\d{8}-\d{8}/);
 });
 
-test('policy avoids demo/early/zero-clock posts, limits noise, and reserves an outcome slot', () => {
-  assert.ok(nextPost(game(), undefined, 0, config, now));
-  for (const overrides of [{ source: 'demo' }, { quarter: 3 }, { clockSeconds: 0 }, { phase: 'pending_try' }] as Partial<GameState>[]) {
-    assert.equal(nextPost(game(overrides), undefined, 0, config, now), null);
+test('policy keeps predictions out of early/demo/incomplete states and closes followed games', () => {
+  assert.ok(nextPost(game(), EMPTY_HISTORY, 0.65));
+  for (const overrides of [{ source: 'demo' }, { quarter: 3 }, { clockSeconds: 0 }, { phase: 'pending_try' }, { fieldStateReliable: false }] as Partial<GameState>[]) {
+    assert.equal(nextPost(game(overrides), EMPTY_HISTORY, 0.65), null);
   }
-  const candidate = nextPost(game(), undefined, 0, config, now)!;
-  const previous = { probability: candidate.probability, created_at: now - 600_000, kind: 'forecast' };
-  assert.equal(nextPost(game(), previous, 1, config, now), null);
-  assert.equal(nextPost(game(), undefined, config.maxPostsPerGame - 1, config, now), null);
-  assert.ok(nextPost(game({ quarter: 5 }), previous, config.maxPostsPerGame - 1, config, now));
-  assert.equal(nextPost(game({ isLive: false, homeScore: 27 }), undefined, 0, config, now), null);
-  assert.ok(nextPost(game({ isLive: false, homeScore: 27 }), previous, 1, config, now));
+  const history = { ...EMPTY_HISTORY, followed: true, q4Milestone: .75 };
+  assert.equal(nextPost(game(), history, .70), null);
+  assert.ok(nextPost(game({ quarter: 5 }), history, null));
+  assert.equal(nextPost(game({ isLive: false, homeScore: 27 }), EMPTY_HISTORY, 0), null);
+  assert.ok(nextPost(game({ isLive: false, homeScore: 27 }), history, 0));
 });
 
 test('generated forecasts and outcomes fit X ASCII text limits', () => {
   for (const g of [game(), game({ quarter: 5 }), game({ isLive: false, homeScore: 27 })]) {
-    const p = nextPost(g, { probability: 0, created_at: 0, kind: 'forecast' }, 1, config, now)!;
+    const p = nextPost(g, { ...EMPTY_HISTORY, followed: true }, .95)!;
     assert.ok(p.text.length <= 280);
     assert.match(p.text, /^[\x20-\x7e\n]+$/);
   }
@@ -146,10 +145,10 @@ test('atomic claim prevents competing workers from sending while delivery is in 
   const path = join(dir, 'state.sqlite');
   const a = new Store(path, 'live'); const b = new Store(path, 'live');
   try {
-    const p = nextPost(game(), undefined, 0, config, now)!;
+    const p = nextPost(game(), EMPTY_HISTORY, .65)!;
     assert.equal(a.claim(p, config, now), true);
     assert.equal(b.claim(p, config, now), false);
-    const other = nextPost(game({ id: '401000002' }), undefined, 0, config, now)!;
+    const other = nextPost(game({ id: '401000002' }), EMPTY_HISTORY, .65)!;
     assert.equal(b.claim(other, config, now), false);
   } finally { a.close(); b.close(); rmSync(dir, { recursive: true }); }
 });
@@ -181,9 +180,9 @@ test('rate limits persist cooldown and permit a fresh retry after reset', async 
 });
 
 test('daily budget blocks additional games and resets at the next UTC day', async () => {
-  const store = new Store(':memory:', 'dry-run'); const limited = { ...config, maxPostsPerDay: 1 };
+  const store = new Store(':memory:', 'dry-run'); const limited = { ...config, maxForecastsPerDay: 1 };
   try {
-    const games = [game({ quarter: 5 }), game({ id: '401000002', quarter: 5 })];
+    const games = [game(), game({ id: '401000002' })];
     assert.equal(await publishGames(games, store, limited, async () => 'unused', now, noop), 1);
     assert.equal(await publishGames(games, store, limited, async () => 'unused', now + 86400_000, noop), 1);
   } finally { store.close(); }

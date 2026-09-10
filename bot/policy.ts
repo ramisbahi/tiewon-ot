@@ -1,43 +1,55 @@
-import { createHash } from 'node:crypto';
-import { predictRegulationTie } from '../web/lib/model';
-import type { GameState } from '../web/lib/types';
-import type { BotConfig } from './config';
+import type { BotGame, GameHistory } from './types';
 
+export const MILESTONES = [0.20, 0.50, 0.75, 0.90] as const;
 export interface Post {
   key: string;
   gameId: string;
-  kind: 'forecast' | 'overtime' | 'final' | 'test';
+  kind: 'q4_threshold' | 'ot_threshold' | 'overtime' | 'final' | 'test';
   text: string;
-  probability: number;
+  probability: number | null;
+  milestone?: number;
+  replyTo?: string;
 }
-export interface PreviousPost { probability: number; created_at: number; kind: string }
 
-export function nextPost(game: GameState, previous: PreviousPost | undefined, count: number, config: BotConfig, now: number): Post | null {
-  if (game.source !== 'live' || game.seasonType === 'preseason' || count >= config.maxPostsPerGame) return null;
+export function nextPost(game: BotGame, history: GameHistory, probability: number | null): Post | null {
+  if (game.source !== 'live' || game.seasonType === 'preseason' || history.finalized) return null;
   const score = `${game.awayTeam} ${game.awayScore} - ${game.homeTeam} ${game.homeScore}`;
-  let kind: Post['kind'];
-  let text: string;
-  let probability: number;
-  if (game.quarter > 4) {
-    if (previous?.kind === 'overtime' || previous?.kind === 'final') return null;
-    // Confirmation doesn't depend on the current OT score being level.
-    kind = 'overtime'; probability = 1;
-    text = `${game.awayTeam} vs ${game.homeTeam}: ${game.isLive ? "We're going to overtime!" : 'Overtime confirmed.'}\n\nRegulation ended tied. #NFL #TieWon`;
-  } else if (!game.isLive) {
-    if (!previous || previous.kind !== 'forecast' || game.awayScore === game.homeScore) return null;
-    kind = 'final'; probability = 0;
-    text = `Final: ${score}\n\nNo overtime this time. #NFL #TieWon`;
-  } else {
-    if (game.quarter !== 4 || game.clockSeconds <= 0 || game.phase !== 'scrimmage' || (previous && previous.kind !== 'forecast')) return null;
-    // Reserve one game slot for the outcome. No automatic repeats of the same forecast text.
-    if (count >= config.maxPostsPerGame - 1) return null;
-    probability = predictRegulationTie(game);
-    if (!previous && probability < config.minProbability) return null;
-    if (previous && (now - previous.created_at < config.cooldownSeconds * 1000 || Math.abs(probability - previous.probability) < config.minChange)) return null;
-    kind = 'forecast';
-    const percentage = Math.min(99.9, probability * 100).toFixed(1);
-    text = `${score} | Q4 ${game.clockLabel}\n\nChance regulation ends tied: ${percentage}%\n\nTieWon model estimate via ESPN. #NFL #TieWon`;
+  const hash = `#${game.awayTeam}vs${game.homeTeam} #TieWon`;
+  const validProbability = probability !== null && Number.isFinite(probability) && probability >= 0 && probability <= 1;
+  const percent = validProbability ? `${Math.min(99.9, probability! * 100).toFixed(1)}%` : '';
+  const isOT = game.quarter > 4;
+  const crossed = validProbability ? MILESTONES.filter((level) => probability! > level && level > (isOT ? history.otMilestone : history.q4Milestone)) : [];
+  const milestone = crossed.at(-1);
+  const crossing = crossed.map((level) => `${Math.round(level * 100)}%`).join(' / ');
+  const base = { gameId: game.id, replyTo: history.lastTweetId };
+
+  // Provider-confirmed outcomes override probability and forecast budgets.
+  if (!game.isLive) {
+    if (!isOT && !history.followed) return null;
+    const tied = game.awayScore === game.homeScore;
+    if (tied && (!isOT || game.seasonType === 'postseason')) return null;
+    const winner = game.homeScore > game.awayScore ? game.homeTeam : game.awayTeam;
+    const text = tied
+      ? `IT'S A TIE.\n\n${score}\nFinal / OT. No winner. TieWon.\n\n${hash}`
+      : isOT
+        ? `TIE WATCH OVER.\n\n${score}\n${winner} wins in overtime.\n\n${hash}`
+        : `NO OVERTIME.\n\n${score}\nFinal. ${winner} closes it out in regulation.\n\n${hash}`;
+    return { ...base, key: `${game.id}:final`, kind: 'final', probability: tied ? 1 : 0, text };
   }
-  const suffix = kind === 'forecast' ? createHash('sha256').update(text).digest('hex').slice(0, 24) : kind;
-  return { key: `${game.id}:${suffix}`, gameId: game.id, kind, text, probability };
+
+  if (isOT && !history.overtimeAnnounced) {
+    const watch = game.seasonType === 'postseason'
+      ? 'Postseason: this game cannot finish tied.'
+      : validProbability
+        ? `Chance of a FINAL TIE: ${percent}\nSimulation estimate.${milestone ? ` Above ${crossing}.` : ''}`
+        : 'Now watching for a final tie.';
+    return { ...base, key: `${game.id}:overtime`, kind: 'overtime', probability: validProbability ? probability : null, milestone,
+      text: `OVERTIME!\n\n${game.awayTeam} vs ${game.homeTeam} went the distance. Regulation ended tied.\n\n${watch}\n\n${hash}` };
+  }
+  if (!validProbability || !milestone || game.clockSeconds <= 0 || game.phase !== 'scrimmage' || game.fieldStateReliable === false) return null;
+  if (!isOT && (game.quarter !== 4 || history.overtimeAnnounced)) return null;
+  if (isOT && game.seasonType === 'postseason') return null;
+  return { ...base, key: `${game.id}:${isOT ? 'tie' : 'ot'}:${Math.round(milestone * 100)}`,
+    kind: isOT ? 'ot_threshold' : 'q4_threshold', probability, milestone,
+    text: `${isOT ? 'TIE' : 'OVERTIME'} WATCH: above ${crossing}.\n\n${score} | ${isOT ? 'OT' : 'Q4'} ${game.clockLabel}\n${isOT ? 'Chance of a FINAL TIE' : 'Chance of OVERTIME'}: ${percent}\n\n${isOT ? 'Simulation' : 'Model'} estimate. ${hash}` };
 }

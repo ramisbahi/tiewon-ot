@@ -1,12 +1,12 @@
 # TieWon
 
-TieWon is a live NFL dashboard for one question: **what is the probability that the score is tied when regulation ends?**
+TieWon is a live NFL dashboard for one question: **what is the probability that nobody wins?** The live board headlines the chance of a final tie and also shows the chance of reaching overtime (a tie at the end of regulation).
 
-The site polls the ESPN public scoreboard during games and scores every state in the browser. When no games are live, an editable scenario lab can play forward any preset or custom state.
+The server polls ESPN during games and saves both probabilities in shared D1 storage. Live and completed games have inspectable probability charts. A clearly labeled Patriots-Seahawks backfill is included. The independent bot worker provides continuous collection when no page is open. Between games, an editable scenario lab can play forward preset or custom states.
 
 The simulator shows two independent views:
 
-- a calibrated binary model specialized for the probability regulation ends tied;
+- a calibrated binary model specialized for the chance of overtime;
 - a separately validated three-way model for away ahead / tied / home ahead; and
 - a 10,000-run Monte Carlo check fitted to 26,352 historical drives, including a rule-aware final win/loss/tie result.
 
@@ -24,7 +24,7 @@ Open `http://localhost:3000`.
 
 ## Live X / Twitter bot
 
-The `bot/` worker powers **@NFL_TieWon** with Q4 regulation-tie probability alerts and confirmed overtime updates, using this same model and feed. It includes dry-run previews, account verification, a persistent SQLite posting ledger, configurable thresholds/budgets, and Docker Compose deployment.
+The `bot/` worker powers **@NFL_TieWon** with Q4 overtime-probability milestones, confirmed overtime, live-OT final-tie milestones, threaded updates and final results, using this same model and feed. It includes dry-run previews, account verification, a persistent SQLite posting ledger, durable milestone deduplication and configurable forecast budgets, and Docker Compose deployment.
 
 See [bot/README.md](bot/README.md) for credentials, verification, launch, and recovery. The website deployment does not automatically start the bot.
 
@@ -73,5 +73,7 @@ The tie trainer:
 - Final-five-minute Brier score: 0.0547, versus 0.0645 for the legacy fallback
 
 The large raw play-by-play files are intentionally ignored by Git. The deployed site needs only the 69 KB exported model.
+
+See [ESPN_VERIFICATION.md](ESPN_VERIFICATION.md) for checked endpoint contracts, replay evidence and model limitations. The final-tie simulation is not covered by the calibrated regulation model's validation metrics.
 
 See [AUDIT.md](AUDIT.md) for what was removed, what changed, and remaining limitations.

@@ -199,3 +199,23 @@ h1 { margin: 0; font-size: clamp(45px, 6vw, 82px); line-height: .96; letter-spac
 }
 
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+
+.ot-secondary { order: -1; }
+.ot-secondary strong { font-size: 24px; color: #3158a8; }
+.ot-secondary span { font-weight: 700; color: var(--ink); }
+.history-panel { margin: 14px 7px 0 0; padding: 20px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; font-size: 16px; }
+.history-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.history-heading > span { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; }
+.history-heading i { display: inline-block; width: 16px; height: 4px; }
+.legend-final { background: #d63424; }
+.legend-ot { background: #3158a8; margin-left: 10px; }
+.history-chart { display: block; width: 100%; height: auto; min-height: 170px; }
+.history-chart text { fill: var(--muted); font-size: 14px; font-family: Arial, sans-serif; }
+.history-slider { display: flex; align-items: center; gap: 14px; font-size: 14px; }
+.history-slider input { flex: 1; min-width: 80px; accent-color: #d63424; }
+.history-readout { display: flex; flex-wrap: wrap; gap: 12px 20px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 14px; }
+.history-note { color: var(--muted); font-size: 14px; line-height: 1.5; }
+.archive-section { margin-top: 40px; }
+.archive-section label { display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
+.archive-section select { max-width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); font-size: 16px; }
+@media (max-width: 600px) { .history-panel { padding: 14px; } .archive-section .board-heading { flex-direction: column; align-items: stretch; } .history-heading { align-items: flex-start; flex-direction: column; } }
