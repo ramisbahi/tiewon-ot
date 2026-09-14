@@ -17,7 +17,7 @@ function snapshotId(game: BotGame, time: number) {
   return `${game.id}:${Math.floor(time / 15000)}:${game.quarter}:${game.clockSeconds}:${game.homeScore}:${game.awayScore}:${game.isLive ? 'live' : 'final'}`;
 }
 export function snapshot(game: BotGame, probabilities: Probabilities, observedAt: number): Snapshot {
-  return { id: snapshotId(game, observedAt), gameId: game.id, observedAt, modelVersion: LIVE_MODEL_VERSION, origin: 'live', game, probabilities };
+  return { id: snapshotId(game, observedAt), gameId: game.id, observedAt, modelVersion: game.kickoffForecast?.modelVersion ?? LIVE_MODEL_VERSION, origin: 'live', game, probabilities };
 }
 export function validSnapshot(value: unknown): value is Snapshot {
   if (!value || typeof value !== 'object') return false;

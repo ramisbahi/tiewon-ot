@@ -6,7 +6,7 @@ export interface OvertimeContext {
   source: 'espn-drives' | 'scenario';
 }
 export interface BotGame extends GameState {
-  kickoffForecast?: { overtime: number; finalTie: number; basis: string };
+  kickoffForecast?: { modelVersion: string; overtime: number; finalTie: number; basis: string };
   fieldStateReliable?: boolean;
   overtime?: OvertimeContext;
   providerPeriod?: number;

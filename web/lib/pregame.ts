@@ -1,5 +1,5 @@
 import baseline from './pregame-baseline.json';
-import { FRESH_OT_TIE_RATE } from './ot-model';
+import { FRESH_OT_TIE_RATE, OT_MODEL_VERSION } from './ot-model';
 import type { BotGame } from './live-types';
 export interface PregameLine {
   gameId: string; homeTeam: string; awayTeam: string; spread: number;
@@ -11,7 +11,7 @@ export function kickoffEstimate(game: BotGame, line?: PregameLine) {
     && line.capturedAt < line.kickoffAt && line.kickoffAt-line.capturedAt<=24*3600000
     && line.kickoffAt === Date.parse(game.startTime ?? '');
   const overtime = valid ? baseline.bins.find(b=>Math.abs(line.spread)<=b.maxSpread)!.probability : baseline.baseline;
-  return { overtime, finalTie: game.seasonType === 'postseason' ? 0 : overtime*FRESH_OT_TIE_RATE,
+  return { modelVersion: `${baseline.version}+${OT_MODEL_VERSION}`, overtime, finalTie: game.seasonType === 'postseason' ? 0 : overtime*FRESH_OT_TIE_RATE,
     basis: valid ? 'pregame spread + historical OT rates' : 'historical average; pregame odds unavailable' };
 }
 // Accept prices only while ESPN explicitly reports the event as not started.

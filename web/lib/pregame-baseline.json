@@ -45,5 +45,5 @@
     "logLossSpread": 0.21247074729845986,
     "logLossFlat": 0.2134006939067821
   },
-  "notes": "Historical closing-spread buckets; live pregame quotes can differ. Small holdout improvement, not a calibrated sportsbook OT price. One 2017-2025 regular-season game lacks a usable spread. No 2026 outcomes used."
+  "notes": "Historical closing-spread buckets; live pregame quotes can differ. Small holdout improvement, not a calibrated sportsbook OT price. Only completed games with usable spreads; canceled/unplayed games excluded. No 2026 outcomes used."
 }
