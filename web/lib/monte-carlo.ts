@@ -1,4 +1,5 @@
 import simulationData from './simulation-data.json';
+import { resolveOvertimeDrive, type OTFrame } from './ot-model';
 import type { GameState, Possession } from './types';
 
 type DriveResult = 'Touchdown' | 'Field goal' | 'Safety' | 'Opp touchdown' | 'No score';
@@ -84,56 +85,23 @@ function overtimeOutcome(
   rules: GameState['overtimeRules'],
   random: () => number,
 ): 'home' | 'away' | 'tie' {
-  let offense: Possession = random() < 0.5 ? 'home' : 'away';
+  const frame: OTFrame = { scores, offense: random() < 0.5 ? 'home' : 'away', completed: { home: 0, away: 0 } };
   let seconds = rules === 'postseason' ? 900 : 600;
-  const possessions = { home: 0, away: 0 };
-  let suddenDeath = false;
   let periods = 0;
-
+  const resultAtExpiry = () => scores.home === scores.away ? 'tie' as const : scores.home > scores.away ? 'home' as const : 'away' as const;
   while (periods < 6) {
     const result = chooseOutcome(25, 1, random);
     const duration = chooseDuration(25, result, random);
     if (duration > seconds) {
-      if (rules !== 'postseason') return 'tie';
+      if (rules !== 'postseason') return resultAtExpiry();
       seconds = 900;
       periods += 1;
       continue;
     }
     seconds -= duration;
-    possessions[offense] += 1;
-    const defense = other(offense);
-    let scoringSide: Possession | null = null;
-    let touchdown = false;
-    if (result === 'Touchdown') {
-      addPoints(scores, offense, 6);
-      addPoints(scores, offense, conversionPoints(scores, offense, random));
-      scoringSide = offense;
-      touchdown = true;
-    } else if (result === 'Field goal') {
-      addPoints(scores, offense, 3);
-      scoringSide = offense;
-    } else if (result === 'Safety') {
-      addPoints(scores, defense, 2);
-      scoringSide = defense;
-    } else if (result === 'Opp touchdown') {
-      addPoints(scores, defense, 6);
-      addPoints(scores, defense, conversionPoints(scores, defense, random));
-      scoringSide = defense;
-      touchdown = true;
-    }
-
-    // A defensive score ends overtime because the scoring team possessed the
-    // turnover. Under legacy rules, an opening offensive touchdown also ends it.
-    if (scoringSide === defense) return scoringSide;
-    if (rules === 'legacy_regular' && possessions.home + possessions.away === 1 && touchdown) return offense;
-
-    const bothPossessed = possessions.home > 0 && possessions.away > 0;
-    if (bothPossessed && scores.home !== scores.away) return scores.home > scores.away ? 'home' : 'away';
-    if (bothPossessed) suddenDeath = true;
-    if (suddenDeath && scoringSide && scores.home !== scores.away) return scores.home > scores.away ? 'home' : 'away';
-    offense = defense;
+    if (resolveOvertimeDrive(frame, result, rules, random)) return resultAtExpiry();
   }
-  if (scores.home !== scores.away) return scores.home > scores.away ? 'home' : 'away';
+  if (scores.home !== scores.away) return resultAtExpiry();
   return rules === 'postseason' ? (random() < 0.5 ? 'home' : 'away') : 'tie';
 }
 

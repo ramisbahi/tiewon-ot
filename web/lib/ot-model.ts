@@ -2,7 +2,9 @@ import data from './simulation-data.json';
 import type { Possession } from './types';
 import type { BotGame, OvertimeContext } from './live-types';
 
-export const OT_MODEL_VERSION = `${data.version}-live-ot-v1`;
+export const OT_MODEL_VERSION = `${data.version}-live-ot-v2`;
+// User-specified strategy assumption, not a measured historical attempt rate.
+export const OT_RESPONSE_TWO_POINT_RATE = 0.90;
 type Outcome = 'Touchdown' | 'Field goal' | 'Safety' | 'Opp touchdown' | 'No score';
 const other = (team: Possession): Possession => team === 'home' ? 'away' : 'home';
 function randomFor(seed: string) {
@@ -22,12 +24,19 @@ export function resolveOvertimeDrive(frame: OTFrame, result: Outcome, rules: Bot
   const defense = other(offense);
   const total = frame.completed.home + frame.completed.away;
   const suddenDeath = total > 0 && frame.scores.home === frame.scores.away;
-  if (result === 'Safety' || result === 'Opp touchdown') return true;
+  if (result === 'Safety' || result === 'Opp touchdown') {
+    frame.scores[defense] += result === 'Safety' ? 2 : 6;
+    return true;
+  }
   if (result === 'Touchdown') {
     frame.scores[offense] += 6;
     if (suddenDeath || rules === 'legacy_regular' && total === 0 || frame.completed[defense] > 0 && frame.scores[offense] > frame.scores[defense]) return true;
     const deficit = frame.scores[defense] - frame.scores[offense];
-    const two = deficit === 2 || deficit === 8;
+    // A 6–8 point opening-possession lead means the opponent scored a TD.
+    // After the response TD, independently draw the decision and conversion.
+    const respondingToTD = total === 1 && frame.completed[defense] === 1
+      && frame.completed[offense] === 0 && deficit >= 0 && deficit <= 2;
+    const two = respondingToTD ? random() < OT_RESPONSE_TWO_POINT_RATE : deficit === 2 || deficit === 8;
     if (random() < data.tryRates[two ? 'two_point' : 'kick']) frame.scores[offense] += two ? 2 : 1;
   } else if (result === 'Field goal') {
     frame.scores[offense] += 3;

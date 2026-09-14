@@ -15,7 +15,7 @@ An independent Node worker reuses the website's ESPN adapter and calibrated regu
 
 There are no periodic low-value updates between milestones. The maximum natural game sequence is four Q4 forecasts, one OT confirmation, four OT forecasts, and one final; a high opening OT probability can combine milestones into the OT announcement. Games first seen after finishing receive a final only if they reached OT or were previously followed.
 
-Both probabilities are estimates. Regulation OT probability uses the calibrated historical model. Final-tie probability in regulation multiplies it by a team-neutral simulated fresh-OT draw rate. In OT, simulation starts at the actual score, clock, field state and completed possessions. This new residual-drive approximation is **not separately calibrated**; the regulation model's validation statistics do not validate final-tie probabilities.
+Both probabilities are estimates. Regulation OT probability uses the calibrated historical model. Final-tie probability in regulation multiplies it by a team-neutral simulated fresh-OT draw rate. In OT, simulation starts at the actual score, clock, field state and completed possessions. A responding OT touchdown against an opening touchdown chooses a two-point try 90% of the time, with conversion success sampled separately from historical try rates. This is a user-specified strategy assumption, not a measured attempt rate. Failed tries can produce a winner; scoreless OT and matching field goals can still end tied when time expires. This new residual-drive approximation is **not separately calibrated**; the regulation model's validation statistics do not validate final-tie probabilities.
 
 ## Shared probability history
 

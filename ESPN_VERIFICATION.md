@@ -35,3 +35,9 @@ The new live-OT model tracks actual scores and completed possessions. Its score-
 `bot/tests/fixtures/ne-sea-2026-summary.json` contains the relevant fields from the real ESPN response. `bot/backfill.ts` produces the 179 immutable points in `web/lib/backfills/401872656.json`. They carry `origin: reconstructed`, play IDs, provider wallclock times, reconstruction time, and model version. Missing or non-scrimmage states produce gaps. No replay post is sent to X.
 
 The reconstructed Q4 OT probability peaks at approximately 43.8% at 0:26, before New England's last interception. This is a hindsight reconstruction of the current model on historical inputs, not evidence that the bot observed or published that probability during the game.
+
+## September 14 strategy update
+
+Live OT model v2 and the scenario simulator share the same overtime score-transition logic. After a touchdown responds to an opening touchdown (a 6–8 point lead before the response), the offense attempts two points with probability 0.90, otherwise a kick. This is the requested strategy assumption, not an empirical NFL frequency. Attempt choice and conversion success use separate random draws. TDs that already win the game require no conversion. Scoreless overtime and matching field goals remain possible ties; the model does not force predetermined scenario frequencies.
+
+The simulator now returns the actual leader at OT clock expiry instead of automatically returning a draw during an unfinished response possession. Existing stored snapshots, including the Patriots-Seahawks backfill, retain their original model version and probabilities. New forecasts use v2.

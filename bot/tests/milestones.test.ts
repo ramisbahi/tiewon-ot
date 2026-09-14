@@ -75,7 +75,8 @@ test('live OT drive rules distinguish first opportunity, equalizing scores, and 
   let f = frame();
   assert.equal(resolveOvertimeDrive(f, 'Touchdown', 'current_regular', () => 0), false);
   assert.equal(f.scores.home, 7);
-  assert.equal(resolveOvertimeDrive(f, 'Touchdown', 'current_regular', () => 0), false);
+  const kickAndMake = [.95, 0];
+  assert.equal(resolveOvertimeDrive(f, 'Touchdown', 'current_regular', () => kickAndMake.shift()!), false);
   assert.equal(resolveOvertimeDrive(f, 'Field goal', 'current_regular', () => 0), true);
   f = frame();
   assert.equal(resolveOvertimeDrive(f, 'Field goal', 'current_regular', () => 0), false);
@@ -85,6 +86,36 @@ test('live OT drive rules distinguish first opportunity, equalizing scores, and 
   assert.equal(resolveOvertimeDrive(f, 'Touchdown', 'current_regular', () => 0), true);
   assert.equal(resolveOvertimeDrive(frame(), 'Touchdown', 'legacy_regular', () => 0), true);
   assert.equal(resolveOvertimeDrive(frame(), 'Safety', 'current_regular', () => 0), true);
+});
+
+test('responding OT touchdowns choose two points 90% of the time, separately from conversion success', () => {
+  const response = (): OTFrame => ({ scores: { home: 7, away: 0 }, completed: { home: 1, away: 0 }, offense: 'away' });
+  let twoPointAttempts = 0;
+  for (let i = 0; i < 100; i++) {
+    const f = response(); const draws = [(i + .5) / 100, 0];
+    const decided = resolveOvertimeDrive(f, 'Touchdown', 'current_regular', () => draws.shift()!);
+    if (f.scores.away === 8) { twoPointAttempts++; assert.equal(decided, true); }
+    else { assert.equal(f.scores.away, 7); assert.equal(decided, false); }
+    assert.equal(draws.length, 0);
+  }
+  assert.equal(twoPointAttempts, 90);
+  for (const decision of [.5, .95]) {
+    const f = response(); const draws = [decision, .99999];
+    assert.equal(resolveOvertimeDrive(f, 'Touchdown', 'current_regular', () => draws.shift()!), true);
+    assert.equal(f.scores.away, 6); // missed conversion loses, not a draw
+  }
+  const beatFG: OTFrame = { scores: { home: 3, away: 0 }, completed: { home: 1, away: 0 }, offense: 'away' };
+  assert.equal(resolveOvertimeDrive(beatFG, 'Touchdown', 'current_regular', () => { throw new Error('No try after winning TD'); }), true);
+});
+
+test('scoreless OT and matching field goals preserve a possible tie until time expires', () => {
+  for (const results of [['No score', 'No score'], ['Field goal', 'Field goal']] as const) {
+    const f: OTFrame = { scores: { home: 24, away: 24 }, completed: { home: 0, away: 0 }, offense: 'home' };
+    for (const result of results) assert.equal(resolveOvertimeDrive(f, result, 'current_regular', () => 0), false);
+    assert.equal(f.scores.home, f.scores.away);
+    assert.equal(resolveOvertimeDrive(f, 'No score', 'current_regular', () => 0), false);
+    assert.equal(resolveOvertimeDrive(f, 'Field goal', 'current_regular', () => 0), true);
+  }
 });
 
 test('OT clock expiry uses actual score and forecasts require possession history', () => {
