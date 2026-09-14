@@ -3,6 +3,7 @@ import type { Probabilities } from '../web/lib/live-probabilities';
 import type { BotGame } from '../web/lib/live-types';
 export interface QuarterUpdate { quarter: number; game: BotGame; probabilities: Probabilities; boundary: boolean }
 export interface GameHistory {
+  kickoffAnnounced?: boolean;
   quarterUpdate?: QuarterUpdate;
   peakTie?: number | null;
   peakOvertime?: number | null;

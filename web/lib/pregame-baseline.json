@@ -1,0 +1,49 @@
+{
+  "version": "pregame-spread-buckets-v1",
+  "source": "https://raw.githubusercontent.com/nflverse/nfldata/master/data/games.csv",
+  "sourceSha256": "96850cf47d9354961f1aebed3bde662913ce31dfebb527b81bd5eafe4122d864",
+  "seasons": [
+    2017,
+    2025
+  ],
+  "games": 2383,
+  "overtimeGames": 131,
+  "baseline": 0.05497272345782627,
+  "shrinkageGames": 100,
+  "bins": [
+    {
+      "maxSpread": 3,
+      "games": 882,
+      "overtimeGames": 46,
+      "probability": 0.05244121420140797
+    },
+    {
+      "maxSpread": 7,
+      "games": 936,
+      "overtimeGames": 61,
+      "probability": 0.064186556318323
+    },
+    {
+      "maxSpread": 40,
+      "games": 565,
+      "overtimeGames": 24,
+      "probability": 0.04435680051997387
+    }
+  ],
+  "validation": {
+    "trainSeasons": [
+      2017,
+      2023
+    ],
+    "testSeasons": [
+      2024,
+      2025
+    ],
+    "testGames": 544,
+    "brierSpread": 0.052011002661279525,
+    "brierFlat": 0.05210591176017488,
+    "logLossSpread": 0.21247074729845986,
+    "logLossFlat": 0.2134006939067821
+  },
+  "notes": "Historical closing-spread buckets; live pregame quotes can differ. Small holdout improvement, not a calibrated sportsbook OT price. One 2017-2025 regular-season game lacks a usable spread. No 2026 outcomes used."
+}

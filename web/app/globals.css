@@ -209,7 +209,7 @@ h1 { margin: 0; font-size: clamp(45px, 6vw, 82px); line-height: .96; letter-spac
 .history-heading i { display: inline-block; width: 16px; height: 4px; }
 .legend-final { background: #d63424; }
 .legend-ot { background: #3158a8; margin-left: 10px; }
-.history-chart { display: block; width: 100%; height: auto; min-height: 170px; cursor: crosshair; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.history-chart { display: block; width: 100%; height: auto; min-height: 170px; cursor: ew-resize; touch-action: none; user-select: none; -webkit-user-select: none; }
 .history-chart:focus-visible { outline: 2px solid #3158a8; outline-offset: 4px; border-radius: 4px; }
 .history-scrub-hint { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 .history-chart text { fill: var(--muted); font-size: 14px; font-family: Arial, sans-serif; }
@@ -219,3 +219,5 @@ h1 { margin: 0; font-size: clamp(45px, 6vw, 82px); line-height: .96; letter-spac
 .archive-section label { display: flex; flex-direction: column; gap: 8px; font-size: 14px; }
 .archive-section select { max-width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); font-size: 16px; }
 @media (max-width: 600px) { .history-panel { padding: 14px; } .archive-section .board-heading { flex-direction: column; align-items: stretch; } .history-heading { align-items: flex-start; flex-direction: column; } }
+
+.history-chart .history-cursor-handle { fill: var(--panel); stroke: #657081; stroke-width: 1.5; }

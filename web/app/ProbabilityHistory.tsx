@@ -106,6 +106,9 @@ export default function ProbabilityHistory({ gameId, live }: { gameId: string; l
       {[0, .2, .5, .75, .9, 1].map(p => <g key={p}><line x1="50" x2="940" y1={y(p)} y2={y(p)} stroke="#d9d7cf" strokeDasharray={p > 0 && p < 1 ? '4 5' : undefined} /><text x="42" y={y(p) + 4} textAnchor="end">{Math.round(p * 100)}%</text></g>)}
       <path d={paths('overtime')} fill="none" stroke="#3158a8" strokeWidth="2.5" strokeDasharray="6 3" />
       <path d={paths('finalTie')} fill="none" stroke="#d63424" strokeWidth="3.5" />
+      <rect x={cursorX - 16} y="20" width="32" height="180" fill="transparent" />
+      <rect className="history-cursor-handle" x={cursorX - 10} y="16" width="20" height="16" rx="5" />
+      <path d={`M${cursorX - 3},20v8 M${cursorX + 3},20v8`} stroke="#657081" strokeWidth="1.5" />
       <line x1={cursorX} x2={cursorX} y1="25" y2="195" stroke="#657081" strokeWidth="1.5" strokeDasharray="3 3" />
       {(['finalTie', 'overtime'] as const).map(key => point.probabilities[key] !== null && <circle key={key} cx={cursorX} cy={y(point.probabilities[key]!)} r="4" fill={key === 'finalTie' ? '#d63424' : '#3158a8'} />)}
       <text x="50" y="219">{reconstructed ? 'Kickoff · play order →' : new Date(firstTime).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}</text>

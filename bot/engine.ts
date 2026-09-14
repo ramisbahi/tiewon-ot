@@ -1,3 +1,4 @@
+import { kickoffEstimate } from '../web/lib/pregame';
 import type { BotGame } from './types';
 import { liveProbabilities, type Probabilities } from '../web/lib/live-probabilities';
 import type { BotConfig } from './config';
@@ -41,13 +42,16 @@ export async function publishPost(candidate: Post, store: Store, config: BotConf
 export async function publishGames(games: BotGame[], store: Store, config: BotConfig, post: (text: string, replyTo?: string) => Promise<string>, now = Date.now(), log: (message: string) => void = console.log, predict: (game: BotGame) => Probabilities = game => liveProbabilities(game, config.overtimeRuns)) {
   let published = 0;
   let attempts = 0;
-  const candidates = games.flatMap(game => {
-    const probabilities = predict(game);
+  const candidates = games.flatMap(input => {
+    const history = store.gameHistory(input.id);
+    const atStart = input.isLive && input.quarter === 1 && input.clockSeconds >= 810 && input.homeScore === 0 && input.awayScore === 0 && !history.kickoffAnnounced;
+    const game = atStart ? { ...input, kickoffForecast: kickoffEstimate(input, store.pregame(input.id)) } : input;
+    const probabilities = game.kickoffForecast ?? predict(game);
     store.observe(game, probabilities, now);
     const candidate = nextPost(game, store.gameHistory(game.id), game.quarter > 4 ? probabilities.finalTie : probabilities.overtime, probabilities);
     return candidate ? [candidate] : [];
   });
-  const priority = (p: Post) => p.kind === 'overtime' ? 0 : p.kind === 'final' ? 1 : (p.kind === 'halftime' || p.kind === 'quarter') ? 2 : p.kind === 'ot_threshold' ? 3 : 4;
+  const priority = (p: Post) => p.kind === 'overtime' ? 0 : p.kind === 'final' ? 1 : (p.kind === 'kickoff' || p.kind === 'halftime' || p.kind === 'quarter') ? 2 : p.kind === 'ot_threshold' ? 3 : 4;
   // Resolve actual outcomes before spending the daily budget on forecasts.
   for (const candidate of candidates.sort((a, b) => priority(a) - priority(b))) {
     // At most three 15-second requests per snapshot; remaining games get a fresh poll.

@@ -1,3 +1,4 @@
+import { pregameLines, type PregameLine } from './pregame';
 import { ESPN_SCOREBOARD_URL, parseScoreboard } from './espn';
 import type { BotGame } from './live-types';
 import type { Possession } from './types';
@@ -90,9 +91,10 @@ async function getJson(url: string, request: typeof fetch) {
   if (!Number.isFinite(age) || age > 120) throw new Error('ESPN returned a stale cached response');
   return response.json();
 }
-export async function fetchGames(now = Date.now(), request: typeof fetch = fetch): Promise<BotGame[]> {
+export async function fetchGames(now = Date.now(), request: typeof fetch = fetch, capturePregame?: (lines: PregameLine[]) => void): Promise<BotGame[]> {
   const date = (time: number) => new Date(time).toISOString().slice(0, 10).replaceAll('-', '');
   const payload = await getJson(`${ESPN_SCOREBOARD_URL}?dates=${date(now - 86400000)}-${date(now)}&limit=100`, request);
+  capturePregame?.(pregameLines(payload, now));
   return Promise.all(botGames(payload, now).map(async game => {
     if (!game.isLive || game.quarter <= 4 || game.seasonType === 'postseason' || !game.fieldStateReliable) return game;
     try { return attachOvertimeContext(game, await getJson(`${ESPN_SUMMARY_URL}?event=${game.id}`, request)); }

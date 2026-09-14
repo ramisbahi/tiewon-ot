@@ -58,7 +58,7 @@ async function main() {
       try {
         games = fixtureIndex >= 0
           ? botGames(JSON.parse(readFileSync(args[fixtureIndex + 1], 'utf8')), now)
-          : await fetchGames(now);
+          : await fetchGames(now, fetch, lines => store.savePregame(lines));
         failures = 0;
       } catch {
         if (once) throw new Error('Could not load a valid, fresh ESPN scoreboard');

@@ -1,3 +1,4 @@
+import type { PregameLine } from '../web/lib/pregame';
 import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
@@ -38,6 +39,12 @@ export class Store {
       throw new Error('Database mode mismatch: live and dry-run must use separate databases');
     }
   }
+  savePregame(lines: PregameLine[]) {
+    for (const line of lines) this.db.prepare('INSERT INTO settings VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(`pregame:${line.gameId}`,JSON.stringify(line));
+  }
+  pregame(gameId: string): PregameLine | undefined {
+    const value=this.setting(`pregame:${gameId}`); return value ? JSON.parse(value) : undefined;
+  }
   close() { this.db.close(); }
   setting(key: string) {
     return (this.db.prepare('SELECT value FROM settings WHERE key=?').get(key) as { value: string } | undefined)?.value;
@@ -57,6 +64,7 @@ export class Store {
       if (row.kind === 'q4_threshold') history.q4Milestone = Math.max(history.q4Milestone, Number(row.milestone));
       if (row.kind === 'ot_threshold' || row.kind === 'overtime') history.otMilestone = Math.max(history.otMilestone, Number(row.milestone));
       if (row.kind === 'overtime') history.overtimeAnnounced = true;
+      if (row.kind === 'kickoff') history.kickoffAnnounced = true;
       if (row.kind === 'halftime') history.halftimeAnnounced = true;
       if (row.kind === 'final') history.finalized = true;
       if (row.tweet_id && /^\d+$/.test(String(row.tweet_id))) history.lastTweetId = String(row.tweet_id);
@@ -110,9 +118,9 @@ export class Store {
         if (post.kind === 'overtime' && history.overtimeAnnounced) return false;
         if (post.kind === 'halftime' && history.halftimeAnnounced) return false;
         // Outcome alerts have reserved access: forecast volume must never suppress OT/finals.
-        if (!['quarter', 'halftime', 'overtime', 'final'].includes(post.kind)) {
+        if (!['kickoff', 'quarter', 'halftime', 'overtime', 'final'].includes(post.kind)) {
           const dayStart = Math.floor(now / 86400_000) * 86400_000;
-          const daily = Number(this.db.prepare("SELECT COUNT(*) AS n FROM posts WHERE created_at>=? AND status!='rejected' AND kind NOT IN ('quarter','halftime','overtime','final')").get(dayStart)!.n);
+          const daily = Number(this.db.prepare("SELECT COUNT(*) AS n FROM posts WHERE created_at>=? AND status!='rejected' AND kind NOT IN ('kickoff','quarter','halftime','overtime','final')").get(dayStart)!.n);
           if (daily >= config.maxForecastsPerDay) return false;
         }
         // Re-read the parent under the same transaction that claims the send.
