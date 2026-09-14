@@ -54,6 +54,7 @@ export class Store {
       if (row.kind === 'q4_threshold') history.q4Milestone = Math.max(history.q4Milestone, Number(row.milestone));
       if (row.kind === 'ot_threshold' || row.kind === 'overtime') history.otMilestone = Math.max(history.otMilestone, Number(row.milestone));
       if (row.kind === 'overtime') history.overtimeAnnounced = true;
+      if (row.kind === 'halftime') history.halftimeAnnounced = true;
       if (row.kind === 'final') history.finalized = true;
       if (row.tweet_id && /^\d+$/.test(String(row.tweet_id))) history.lastTweetId = String(row.tweet_id);
     }
@@ -88,10 +89,11 @@ export class Store {
         if (post.kind === 'q4_threshold' && (history.overtimeAnnounced || history.q4Milestone >= (post.milestone ?? 0))) return false;
         if (post.kind === 'ot_threshold' && history.otMilestone >= (post.milestone ?? 0)) return false;
         if (post.kind === 'overtime' && history.overtimeAnnounced) return false;
+        if (post.kind === 'halftime' && history.halftimeAnnounced) return false;
         // Outcome alerts have reserved access: forecast volume must never suppress OT/finals.
-        if (!['overtime', 'final'].includes(post.kind)) {
+        if (!['halftime', 'overtime', 'final'].includes(post.kind)) {
           const dayStart = Math.floor(now / 86400_000) * 86400_000;
-          const daily = Number(this.db.prepare("SELECT COUNT(*) AS n FROM posts WHERE created_at>=? AND status!='rejected' AND kind NOT IN ('overtime','final')").get(dayStart)!.n);
+          const daily = Number(this.db.prepare("SELECT COUNT(*) AS n FROM posts WHERE created_at>=? AND status!='rejected' AND kind NOT IN ('halftime','overtime','final')").get(dayStart)!.n);
           if (daily >= config.maxForecastsPerDay) return false;
         }
         // Re-read the parent under the same transaction that claims the send.

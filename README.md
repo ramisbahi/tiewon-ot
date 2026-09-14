@@ -2,7 +2,7 @@
 
 TieWon is a live NFL dashboard for one question: **what is the probability that nobody wins?** The live board headlines the chance of a final tie and also shows the chance of reaching overtime (a tie at the end of regulation).
 
-The server polls ESPN during games and saves both probabilities in shared D1 storage. Live and completed games have inspectable probability charts. A clearly labeled Patriots-Seahawks backfill is included. The independent bot worker provides continuous collection when no page is open. Between games, an editable scenario lab can play forward preset or custom states.
+The server polls ESPN during games and saves both probabilities in shared D1 storage. Live and completed games have inspectable probability charts. All 15 completed 2026 Week 1 games have reconstructed histories, including the Rams game and every Sunday game. The independent bot worker provides continuous collection when no page is open. Between games, an editable scenario lab covers Q1–Q4 plus overtime opening, response and sudden-death states.
 
 The simulator shows two independent views:
 
@@ -24,7 +24,7 @@ Open `http://localhost:3000`.
 
 ## Live X / Twitter bot
 
-The `bot/` worker powers **@NFL_TieWon** with Q4 overtime-probability milestones, confirmed overtime, live-OT final-tie milestones, threaded updates and final results, using this same model and feed. It includes dry-run previews, account verification, a persistent SQLite posting ledger, durable milestone deduplication and configurable forecast budgets, and Docker Compose deployment.
+The `bot/` worker powers **@NFL_TieWon** with unconditional halftime updates, Q4 overtime-probability milestones, confirmed overtime, live-OT final-tie milestones, threaded updates and final results, using this same model and feed. It includes dry-run previews, account verification, a persistent SQLite posting ledger, durable milestone deduplication and configurable forecast budgets, and Docker Compose deployment.
 
 See [bot/README.md](bot/README.md) for credentials, verification, launch, and recovery. The website deployment does not automatically start the bot.
 

@@ -7,6 +7,7 @@ import { simulateTieProbabilityAsync, simulationSummary, type SimulationResult }
 import { simulateNextPlay } from '@/lib/simulator';
 import { liveProbabilities, type Probabilities } from '@/lib/live-probabilities';
 import type { BotGame } from '@/lib/live-types';
+import OvertimeSimulator from './OvertimeSimulator';
 import ProbabilityHistory from './ProbabilityHistory';
 import type { GamePhase, GameState, OvertimeRules, Possession, TryType } from '@/lib/types';
 
@@ -132,7 +133,7 @@ function LiveBoard({ onOpenSimulator }: { onOpenSimulator: () => void }) {
       </div>
       {stale.length > 0 && <p className="history-note" role="status">Updates delayed for {stale.map(entry => `${entry.game.awayTeam} vs ${entry.game.homeTeam}`).join(', ')}. The last state is not a confirmed final.</p>}
       {archive && <section className="archive-section"><div className="board-heading"><h2>Revisit a game</h2><label>Saved games <select value={archive.game.id} onChange={event => setArchiveId(event.target.value)}>{archived.map(entry => <option key={entry.game.id} value={entry.game.id}>{entry.game.awayTeam} vs {entry.game.homeTeam} · {new Date(entry.game.startTime ?? entry.updatedAt).toLocaleDateString()}</option>)}</select></label></div><GameCard state={archive.game} probabilities={archive.probabilities} /><ProbabilityHistory key={archive.game.id} gameId={archive.game.id} live={false} /></section>}
-      <section className="method-strip"><div><strong>{modelSummary.games.toLocaleString()}</strong><span>games trained</span></div><div><strong>{modelSummary.snapshots.toLocaleString()}</strong><span>play states</span></div><div><strong>0.885</strong><span>late-game AUC</span></div><p>Overtime probability uses a calibrated historical model. Final-tie probability combines it with an overtime drive simulation. In OT, a responding touchdown assumes a 90% chance of going for two. Both are estimates, not guarantees.</p></section>
+      <section className="method-strip"><div><strong>{modelSummary.games.toLocaleString()}</strong><span>games trained</span></div><div><strong>{modelSummary.snapshots.toLocaleString()}</strong><span>play states</span></div><div><strong>0.885</strong><span>late-game AUC</span></div><p>Overtime probability uses a calibrated historical model. Final-tie probability uses a 10% fresh-OT baseline grounded in 2025 results, then adjusts to the state during overtime. In OT, a responding touchdown assumes a 90% chance of going for two. Both are estimates, not guarantees.</p></section>
     </>
   );
 }
@@ -142,6 +143,7 @@ function RangeField({ label, value, min, max, step = 1, display, onChange }: { l
 }
 
 function Simulator() {
+  const [otMode, setOtMode] = useState(false);
   const [state, setState] = useState<GameState>(BASE_DEMO);
   const [activePreset, setActivePreset] = useState(0);
   const [playIndex, setPlayIndex] = useState(0);
@@ -150,7 +152,7 @@ function Simulator() {
   const [simulation, setSimulation] = useState<SimulationResult | null>(null);
   const [simulationProgress, setSimulationProgress] = useState(0);
   useEffect(() => {
-    if (!playing) return;
+    if (!playing || otMode) return;
     const timer = window.setInterval(() => {
       setState((current) => {
         const result = simulateNextPlay(current, playIndex + 1);
@@ -161,8 +163,9 @@ function Simulator() {
       });
     }, 1350);
     return () => window.clearInterval(timer);
-  }, [playing, playIndex]);
+  }, [playing, playIndex, otMode]);
   useEffect(() => {
+    if (otMode) return;
     let cancelled = false;
     const timer = window.setTimeout(async () => {
       setSimulation(null);
@@ -173,7 +176,7 @@ function Simulator() {
       if (!cancelled && result) setSimulation(result);
     }, 120);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [state]);
+  }, [state, otMode]);
   const update = <K extends keyof GameState>(key: K, value: GameState[K]) => {
     setPlaying(false);
     setActivePreset(CUSTOM_PRESET);
@@ -191,7 +194,9 @@ function Simulator() {
   function choosePreset(index: number) { setActivePreset(index); setState({ ...PRESETS[index].state }); setPlaying(false); setPlayIndex(0); setLastEvent(`Loaded: ${PRESETS[index].label}`); }
   function startPlayback() { setPlaying((current) => !current); }
   return (
-    <section className="simulator-section">
+    <>
+    <div className="segmented-field period-selector"><span>Game period</span><div>{[1,2,3,4,5].map(period => <button type="button" key={period} className={(otMode ? 5 : state.quarter) === period ? 'active' : ''} aria-pressed={(otMode ? 5 : state.quarter) === period} onClick={() => { setPlaying(false); setOtMode(period === 5); if (period < 5) update('quarter',period); }}>{period === 5 ? 'OT' : `Q${period}`}</button>)}</div></div>
+    {otMode ? <OvertimeSimulator base={state} /> : <section className="simulator-section">
       <div className="simulator-intro"><div><p className="section-kicker">Scenario lab</p><h2>Build any game state.<br />Check it two ways.</h2></div><p>The calibrated model answers instantly. An independent Monte Carlo engine then samples 10,000 futures from empirical drive outcomes as a visible sanity check.</p></div>
       <div className="preset-grid">{PRESETS.map((preset, index) => <button key={preset.label} className={`preset-card ${activePreset === index ? 'active' : ''}`} type="button" onClick={() => choosePreset(index)}><span>0{index + 1}</span><strong>{preset.label}</strong><small>{preset.description}</small></button>)}</div>
       <div className="simulator-workbench">
@@ -211,7 +216,6 @@ function Simulator() {
           </>}
           <div className="segmented-field"><span>Overtime rules</span><div>{([['current_regular', '2025+ regular'], ['legacy_regular', 'Through 2024'], ['postseason', 'Postseason']] as [OvertimeRules, string][]).map(([rules, label]) => <button className={state.overtimeRules === rules ? 'active' : ''} key={rules} type="button" onClick={() => { update('overtimeRules', rules); if (rules === 'postseason') setState((current) => ({ ...current, seasonType: 'postseason' })); else setState((current) => ({ ...current, seasonType: 'regular' })); }}>{label}</button>)}</div></div>
           <div className="two-column-controls">
-            <RangeField label="Quarter" min={1} max={4} value={state.quarter} display={`Q${state.quarter}`} onChange={(value) => update('quarter', value)} />
             <RangeField label="Quarter clock" min={0} max={900} step={5} value={state.clockSeconds} display={clockLabel(state.clockSeconds)} onChange={(value) => update('clockSeconds', value)} />
             <RangeField label="Down" min={1} max={4} value={state.down} onChange={(value) => update('down', value)} />
             <RangeField label="Yards to go" min={1} max={20} value={state.distance} onChange={(value) => update('distance', value)} />
@@ -231,7 +235,8 @@ function Simulator() {
           <div className="playback-event"><span>Scenario event {playIndex}</span><strong>{lastEvent}</strong></div>
         </aside>
       </div>
-    </section>
+    </section>}
+    </>
   );
 }
 

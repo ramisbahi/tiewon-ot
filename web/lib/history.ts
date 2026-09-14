@@ -8,6 +8,7 @@ export interface Snapshot {
   origin: 'live' | 'reconstructed';
   playId?: string;
   reconstructedAt?: number;
+  timestampEstimated?: boolean;
   game: BotGame;
   probabilities: Probabilities;
 }

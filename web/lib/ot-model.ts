@@ -1,8 +1,10 @@
 import data from './simulation-data.json';
+import baseline from './ot-baseline.json';
 import type { Possession } from './types';
 import type { BotGame, OvertimeContext } from './live-types';
 
-export const OT_MODEL_VERSION = `${data.version}-live-ot-v2`;
+export const OT_MODEL_VERSION = `${data.version}-live-ot-v3`;
+export const FRESH_OT_TIE_RATE = (baseline.ties + baseline.smoothing.alpha) / (baseline.overtimeGames + baseline.smoothing.alpha + baseline.smoothing.beta);
 // User-specified strategy assumption, not a measured historical attempt rate.
 export const OT_RESPONSE_TWO_POINT_RATE = 0.90;
 type Outcome = 'Touchdown' | 'Field goal' | 'Safety' | 'Opp touchdown' | 'No score';
@@ -85,7 +87,7 @@ function drawOnce(game: BotGame, context: OvertimeContext, random: () => number)
   return frame.scores.home === frame.scores.away;
 }
 
-export function predictFinalTie(game: BotGame, runs = 10000): number | null {
+export function predictRawFinalTie(game: BotGame, runs = 10000): number | null {
   if (game.quarter <= 4) return null;
   if (game.seasonType === 'postseason' || game.overtimeRules === 'postseason') return 0;
   if (!game.isLive) return game.homeScore === game.awayScore ? 1 : 0;
@@ -97,4 +99,20 @@ export function predictFinalTie(game: BotGame, runs = 10000): number | null {
   let ties = 0;
   for (let run = 0; run < runs; run++) if (drawOnce(game, game.overtime, random)) ties++;
   return ties / runs;
+}
+
+let rawOpeningRate: number | undefined;
+export function predictFinalTie(game: BotGame, runs = 10000): number | null {
+  const raw = predictRawFinalTie(game, runs);
+  if (raw == null || raw === 0 || raw === 1 || game.overtimeRules !== 'current_regular' || !game.isLive) return raw;
+  if (rawOpeningRate === undefined) {
+    rawOpeningRate = predictRawFinalTie({ ...game, id: 'ot-start-baseline', homeScore: 0, awayScore: 0,
+      quarter: 5, clockSeconds: 600, possession: 'home', down: 1, distance: 10, yardlineOwn: 30,
+      timeoutsHome: 2, timeoutsAway: 2, phase: 'scrimmage', isLive: true, fieldStateReliable: true,
+      overtime: { completed: { home: 0, away: 0 }, firstPossession: 'home', source: 'scenario' } }, 10000)!;
+  }
+  // A single odds-intercept adjustment anchors the state model to prior-season OT
+  // results. This is not out-of-sample validation of its within-OT predictions.
+  const factor = FRESH_OT_TIE_RATE / (1 - FRESH_OT_TIE_RATE) * (1 - rawOpeningRate) / rawOpeningRate;
+  return raw * factor / (1 - raw + raw * factor);
 }

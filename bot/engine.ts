@@ -38,10 +38,10 @@ export async function publishGames(games: BotGame[], store: Store, config: BotCo
   const candidates = games.flatMap(game => {
     const probabilities = predict(game);
     store.observe(game, probabilities, now);
-    const candidate = nextPost(game, store.gameHistory(game.id), game.quarter > 4 ? probabilities.finalTie : probabilities.overtime);
+    const candidate = nextPost(game, store.gameHistory(game.id), game.quarter > 4 ? probabilities.finalTie : probabilities.overtime, probabilities);
     return candidate ? [candidate] : [];
   });
-  const priority = (p: Post) => p.kind === 'overtime' ? 0 : p.kind === 'final' ? 1 : p.kind === 'ot_threshold' ? 2 : 3;
+  const priority = (p: Post) => p.kind === 'overtime' ? 0 : p.kind === 'final' ? 1 : p.kind === 'halftime' ? 2 : p.kind === 'ot_threshold' ? 3 : 4;
   // Resolve actual outcomes before spending the daily budget on forecasts.
   for (const candidate of candidates.sort((a, b) => priority(a) - priority(b))) {
     // At most three 15-second requests per snapshot; remaining games get a fresh poll.

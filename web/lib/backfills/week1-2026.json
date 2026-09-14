@@ -1,0 +1,148 @@
+{
+  "season": 2026,
+  "week": 1,
+  "origin": "reconstructed",
+  "excludedUnfinished": [
+    {
+      "id": "401872931",
+      "name": "Denver Broncos at Kansas City Chiefs"
+    }
+  ],
+  "games": [
+    {
+      "id": "401872656",
+      "name": "New England Patriots at Seattle Seahawks",
+      "startTime": "2026-09-10T00:20Z",
+      "snapshots": 179,
+      "estimatedTimestamps": 0,
+      "modelVersion": "2.0.0+2021-2025-drive-v1-live-ot-v1",
+      "source": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872656"
+    },
+    {
+      "id": "401872657",
+      "name": "San Francisco 49ers at Los Angeles Rams",
+      "startTime": "2026-09-11T00:35Z",
+      "snapshots": 169,
+      "estimatedTimestamps": 0,
+      "modelVersion": "2.0.0+2021-2025-drive-v1-live-ot-v3",
+      "source": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872657"
+    },
+    {
+      "id": "401872925",
+      "name": "Tampa Bay Buccaneers at Cincinnati Bengals",
+      "startTime": "2026-09-13T17:00Z",
+      "snapshots": 177,
+      "estimatedTimestamps": 1,
+      "modelVersion": "2.0.0+2021-2025-drive-v1-live-ot-v3",
+      "source": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872925"
+    },
+    {
+      "id": "401872923",
+      "name": "New Orleans Saints at Detroit Lions",
+      "startTime": "2026-09-13T17:00Z",
+      "snapshots": 226,
+      "estimatedTimestamps": 2,
+      "modelVersion": "2.0.0+2021-2025-drive-v1-live-ot-v3",
+      "source": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872923"
+    },
+    {
+      "id": "401872924",
+      "name": "New York Jets at Tennessee Titans",
+      "startTime": "2026-09-13T17:00Z",
+      "snapshots": 174,
+      "estimatedTimestamps": 0,
+      "modelVersion": "2.0.0+2021-2025-drive-v1-live-ot-v3",
+      "source": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872924"
+    },
+    {
+      "id": "401872659",
+      "name": "Baltimore Ravens at Indianapolis Colts",
+      "startTime": "2026-09-13T17:00Z",
+      "snapshots": 175,
+      "estimatedTimestamps": 0,
+      "modelVersion": "2.0.0+2021-2025-drive-v1-live-ot-v3",
+      "source": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872659"
+    },
+    {
+      "id": "401872658",
+      "name": "Atlanta Falcons at Pittsburgh Steelers",
+      "startTime": "2026-09-13T17:00Z",
+      "snapshots": 189,
+      "estimatedTimestamps": 0,
+      "modelVersion": "2.0.0+2021-2025-drive-v1-live-ot-v3",
+      "source": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872658"
+    },
+    {
+      "id": "401872661",
+      "name": "Chicago Bears at Carolina Panthers",
+      "startTime": "2026-09-13T17:00Z",
+      "snapshots": 199,
+      "estimatedTimestamps": 1,
+      "modelVersion": "2.0.0+2021-2025-drive-v1-live-ot-v3",
+      "source": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872661"
+    },
+    {
+      "id": "401872922",
+      "name": "Cleveland Browns at Jacksonville Jaguars",
+      "startTime": "2026-09-13T17:00Z",
+      "snapshots": 158,
+      "estimatedTimestamps": 0,
+      "modelVersion": "2.0.0+2021-2025-drive-v1-live-ot-v3",
+      "source": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872922"
+    },
+    {
+      "id": "401872660",
+      "name": "Buffalo Bills at Houston Texans",
+      "startTime": "2026-09-13T17:00Z",
+      "snapshots": 188,
+      "estimatedTimestamps": 0,
+      "modelVersion": "2.0.0+2021-2025-drive-v1-live-ot-v3",
+      "source": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872660"
+    },
+    {
+      "id": "401872928",
+      "name": "Miami Dolphins at Las Vegas Raiders",
+      "startTime": "2026-09-13T20:25Z",
+      "snapshots": 179,
+      "estimatedTimestamps": 1,
+      "modelVersion": "2.0.0+2021-2025-drive-v1-live-ot-v3",
+      "source": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872928"
+    },
+    {
+      "id": "401872927",
+      "name": "Green Bay Packers at Minnesota Vikings",
+      "startTime": "2026-09-13T20:25Z",
+      "snapshots": 188,
+      "estimatedTimestamps": 0,
+      "modelVersion": "2.0.0+2021-2025-drive-v1-live-ot-v3",
+      "source": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872927"
+    },
+    {
+      "id": "401872929",
+      "name": "Washington Commanders at Philadelphia Eagles",
+      "startTime": "2026-09-13T20:25Z",
+      "snapshots": 181,
+      "estimatedTimestamps": 1,
+      "modelVersion": "2.0.0+2021-2025-drive-v1-live-ot-v3",
+      "source": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872929"
+    },
+    {
+      "id": "401872926",
+      "name": "Arizona Cardinals at Los Angeles Chargers",
+      "startTime": "2026-09-13T20:25Z",
+      "snapshots": 184,
+      "estimatedTimestamps": 0,
+      "modelVersion": "2.0.0+2021-2025-drive-v1-live-ot-v3",
+      "source": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872926"
+    },
+    {
+      "id": "401872930",
+      "name": "Dallas Cowboys at New York Giants",
+      "startTime": "2026-09-14T00:20Z",
+      "snapshots": 174,
+      "estimatedTimestamps": 1,
+      "modelVersion": "2.0.0+2021-2025-drive-v1-live-ot-v3",
+      "source": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/summary?event=401872930"
+    }
+  ]
+}

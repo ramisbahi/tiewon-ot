@@ -1,18 +1,24 @@
 import { UPSERT_GAME } from './history-sql';
 import { env } from 'cloudflare:workers';
 import type { Snapshot } from './history';
-import patriotsSeahawks from './backfills/401872656.json';
+import { backfills } from './backfills';
 
 let backfillReady: Promise<void> | undefined;
-async function ensureBackfill() {
-  if (!backfillReady) backfillReady = (async () => {
-    const samples = patriotsSeahawks as Snapshot[];
-    const { DB } = historyEnvironment();
-    const row = await DB.prepare("SELECT COUNT(*) AS n FROM snapshots WHERE game_id=? AND id LIKE ?")
-      .bind('401872656', '401872656:replay:%').first<{ n: number }>();
-    if (Number(row?.n) < samples.length) await saveSnapshots(samples);
-  })().catch(error => { backfillReady = undefined; throw error; });
+async function ensureArchive() {
+  if (!backfillReady) backfillReady = saveSnapshots(Object.values(backfills).map(samples => samples.at(-1)!))
+    .catch(error => { backfillReady = undefined; throw error; });
   await backfillReady;
+}
+const seededGames = new Map<string, Promise<void>>();
+async function ensureGame(gameId: string) {
+  if (!backfills[gameId]) return;
+  if (!seededGames.has(gameId)) seededGames.set(gameId, (async () => {
+    const { DB } = historyEnvironment();
+    const row = await DB.prepare('SELECT COUNT(*) AS n FROM snapshots WHERE game_id=? AND id LIKE ?')
+      .bind(gameId, `${gameId}:replay:%`).first<{ n: number }>();
+    if (Number(row?.n) < backfills[gameId].length) await saveSnapshots(backfills[gameId]);
+  })().catch(error => { seededGames.delete(gameId); throw error; }));
+  await seededGames.get(gameId);
 }
 
 export function historyEnvironment() {
@@ -31,13 +37,13 @@ export async function saveSnapshots(samples: Snapshot[]) {
   }
 }
 export async function recentGames() {
-  await ensureBackfill();
+  await ensureArchive();
   const { DB } = historyEnvironment();
   const result = await DB.prepare('SELECT * FROM games ORDER BY updated_at DESC LIMIT 64').all<{id: string; updated_at: number; state: string; overtime: number | null; final_tie: number | null}>();
   return result.results.map(row => ({ game: JSON.parse(row.state), probabilities: { overtime: row.overtime, finalTie: row.final_tie }, updatedAt: row.updated_at }));
 }
 export async function gameSnapshots(gameId: string) {
-  await ensureBackfill();
+  await ensureGame(gameId);
   const { DB } = historyEnvironment();
   const result = await DB.prepare('SELECT payload FROM snapshots WHERE game_id=? ORDER BY observed_at, rowid LIMIT 5000').bind(gameId).all<{payload: string}>();
   const seenFinals = new Set<string>();

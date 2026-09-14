@@ -5,17 +5,18 @@ An independent Node worker reuses the website's ESPN adapter and calibrated regu
 ## Posting behavior
 
 - Poll ESPN every **15 seconds**, including games crossing UTC midnight.
+- At **halftime**, post the score and both probabilities for every regular/postseason game, once, regardless of thresholds or forecast budget. If forecasts are unavailable, the score update still posts.
 - In **Q4**, alert when the probability of reaching overtime is strictly above **20%, 50%, 75%, 90%**.
 - Announce provider-confirmed **OVERTIME!** once, even without an earlier forecast or complete field data.
 - During regular-season **OT**, switch to the probability of a **final tie**, using the same four milestones. Playoff games cannot finish tied.
 - Post the confirmed final: tie, OT winner, or regulation winner for a game previously followed.
 - Keep each game's updates in one reply chain. Each milestone is sent once per game/phase; a dip and recrossing do not repeat it. A jump over several levels produces one message listing those levels.
-- Forecast budget: 128 per UTC day by default. Confirmed OT/final posts bypass this budget. X errors, account access, and uncertain delivery can still delay or block any post.
+- Forecast budget: 128 per UTC day by default. Halftime and confirmed OT/final posts bypass this budget. X errors, account access, and uncertain delivery can still delay or block any post.
 - Skip preseason/demo forecasts. Incomplete field data, pending touchdowns/tries, and unconfirmed 0:00 states produce gaps rather than guesses. OT forecasts additionally require a consistent summary drive history.
 
-There are no periodic low-value updates between milestones. The maximum natural game sequence is four Q4 forecasts, one OT confirmation, four OT forecasts, and one final; a high opening OT probability can combine milestones into the OT announcement. Games first seen after finishing receive a final only if they reached OT or were previously followed.
+The maximum natural game sequence is one halftime update, four Q4 forecasts, one OT confirmation, four OT forecasts, and one final; a high opening OT probability can combine milestones into the OT announcement. Games first seen after finishing receive a final only if they reached OT or were previously followed.
 
-Both probabilities are estimates. Regulation OT probability uses the calibrated historical model. Final-tie probability in regulation multiplies it by a team-neutral simulated fresh-OT draw rate. In OT, simulation starts at the actual score, clock, field state and completed possessions. A responding OT touchdown against an opening touchdown chooses a two-point try 90% of the time, with conversion success sampled separately from historical try rates. This is a user-specified strategy assumption, not a measured attempt rate. Failed tries can produce a winner; scoreless OT and matching field goals can still end tied when time expires. This new residual-drive approximation is **not separately calibrated**; the regulation model's validation statistics do not validate final-tie probabilities.
+Both probabilities are estimates. Regulation OT probability uses the calibrated historical model. Final-tie probability in regulation multiplies it by a **10% fresh-OT tie rate** for current regular-season rules: the Jeffreys-smoothed estimate `(1 + 0.5) / (14 + 1)` from the full 2025 regular season (272 games, 14 OT games, one tie; raw rate 7.1%). The cohort and source URL are in `web/lib/ot-baseline.json`. The prior season is frozen to prevent hindsight in 2026 backfills. Halftime forecasts average both possible receiving teams at a fresh Q3 kickoff with reset timeouts. In OT, simulation starts at the actual score, clock, field state and completed possessions. A responding OT touchdown against an opening touchdown chooses a two-point try 90% of the time, with conversion success sampled separately from historical try rates. This is a user-specified strategy assumption, not a measured attempt rate. Failed tries can produce a winner; scoreless OT and matching field goals can still end tied when time expires. Current-rule live OT estimates receive a constant odds-intercept adjustment to anchor the old roughly 23% simulated opening rate to the 10% empirical baseline. This small-sample baseline adjustment is **not out-of-sample validation** of live states; the regulation model's validation statistics do not validate final-tie probabilities.
 
 ## Shared probability history
 
@@ -37,7 +38,7 @@ cd web
 node --import tsx ../bot/backfill.ts ../bot/tests/fixtures/ne-sea-2026-summary.json lib/backfills/401872656.json
 ```
 
-Reconstruction uses each play's start state, the previous play's score, timeouts tracked within each half, and ESPN wallclock timestamps. It does not use the eventual result to score earlier points. This backfill utility currently supports completed regulation games only.
+Reconstruction uses each play's start state, the previous play's score, timeouts tracked within each half, and ESPN wallclock timestamps. It does not use the eventual result to score earlier points. The backfill utility supports completed regulation and overtime games.
 
 ## Credentials
 
@@ -129,3 +130,24 @@ docker compose -f compose.bot.yml up -d
 ```
 
 Local equivalents are `npm run bot:status` and `npm run bot:resolve -- GAME_ID:KEY POST_ID`. Use the same `BOT_LIVE` and `BOT_DATABASE` as the worker. Resolution never posts immediately; the next poll reevaluates the current game state. Never resolve claims while a worker is actively publishing. Back up the volume with the bot stopped.
+
+## Week 1 archive and OT simulator
+
+The bundled 2026 Week 1 archive covers all 15 completed games: Patriots-Seahawks, Rams-49ers and all 13 Sunday games, including Saints-Lions OT. It contains 2,740 reconstructed snapshots. Monday Denver-Kansas City is excluded until final. The manifest and immutable model outputs are in `web/lib/backfills`; the original Patriots-Seahawks archive retains its original model version.
+
+OT replay tracks earlier completed drives, resets timeouts on entering OT, and scores each play from its start state and the PREVIOUS play's score. No eventual drive/game result is used to estimate an earlier state. Missing wallclocks are interpolated and flagged. Some ESPN wallclocks are also incorrect or nonmonotonic; reconstructed charts use play order and retain raw timestamps in the API. When a full reconstruction exists, the chart shows that coherent series; any original live observations remain stored and accessible through the history API.
+
+The index seeds each bundled game's confirmed final into D1. Selecting a game seeds its full history idempotently, without duplicating or recalculating published snapshots. To backfill the saved cohort:
+
+```bash
+cd web
+node --import tsx ../bot/backfill-week.ts ../bot/tests/fixtures/week1-2026/scoreboard.json ../bot/tests/fixtures/week1-2026 lib/backfills
+```
+
+The original NE-SEA input is `bot/tests/fixtures/ne-sea-2026-summary.json`; copy it as `401872656.json` into the input directory only if rebuilding that missing archive from scratch. Reconstruction scripts are offline and never import the X publisher.
+
+The simulator now exposes Q1/Q2/Q3/Q4/OT. OT offers opening, response and sudden-death stages, score/clock/field/timeout controls and validation. These are normal-snap states after conversions; pending tries are not selectable in the OT panel.
+
+## Railway worker handoff
+
+Use one always-on service from this branch, repository root `/`, Dockerfile `bot/Dockerfile`, image default start command, and a persistent volume at `/app/.bot-state` writable by UID 1000. Configure four X secrets, `BOT_LIVE=true`, `X_EXPECTED_USERNAME=NFL_TieWon`, `BOT_DATABASE=/app/.bot-state/live.sqlite`, and the history URL/token above. Disable sleeping and use one replica. Preserve the existing ledger when migrating a worker and stop the old copy first. Verify authenticated startup and recurring successful polls in host logs before describing the bot as live. A committed Docker configuration or successful X test does not establish that a worker is deployed.

@@ -1,0 +1,227 @@
+{
+  "version": "2025-regular-ot-jeffreys-v1",
+  "source": "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=20250901-20260108&limit=1000",
+  "rulesSource": "https://operations.nfl.com/rules-officiating/featured-rules",
+  "season": 2025,
+  "seasonType": "regular",
+  "completedGames": 272,
+  "overtimeGames": 14,
+  "ties": 1,
+  "smoothing": {
+    "method": "Jeffreys Beta(0.5, 0.5) posterior mean",
+    "alpha": 0.5,
+    "beta": 0.5
+  },
+  "games": [
+    {
+      "id": "401772834",
+      "date": "2025-09-14T17:00Z",
+      "name": "NYG at DAL",
+      "teams": [
+        {
+          "team": "DAL",
+          "score": 40
+        },
+        {
+          "team": "NYG",
+          "score": 37
+        }
+      ]
+    },
+    {
+      "id": "401772921",
+      "date": "2025-09-29T00:20Z",
+      "name": "GB at DAL",
+      "teams": [
+        {
+          "team": "DAL",
+          "score": 40
+        },
+        {
+          "team": "GB",
+          "score": 40
+        }
+      ]
+    },
+    {
+      "id": "401772939",
+      "date": "2025-10-03T00:15Z",
+      "name": "SF at LAR",
+      "teams": [
+        {
+          "team": "LAR",
+          "score": 23
+        },
+        {
+          "team": "SF",
+          "score": 26
+        }
+      ]
+    },
+    {
+      "id": "401772873",
+      "date": "2025-11-02T21:05Z",
+      "name": "JAX at LV",
+      "teams": [
+        {
+          "team": "LV",
+          "score": 29
+        },
+        {
+          "team": "JAX",
+          "score": 30
+        }
+      ]
+    },
+    {
+      "id": "401772636",
+      "date": "2025-11-09T14:30Z",
+      "name": "ATL at IND",
+      "teams": [
+        {
+          "team": "IND",
+          "score": 31
+        },
+        {
+          "team": "ATL",
+          "score": 25
+        }
+      ]
+    },
+    {
+      "id": "401772631",
+      "date": "2025-11-16T14:30Z",
+      "name": "WSH at MIA",
+      "teams": [
+        {
+          "team": "MIA",
+          "score": 16
+        },
+        {
+          "team": "WSH",
+          "score": 13
+        }
+      ]
+    },
+    {
+      "id": "401772882",
+      "date": "2025-11-16T18:00Z",
+      "name": "CAR at ATL",
+      "teams": [
+        {
+          "team": "ATL",
+          "score": 27
+        },
+        {
+          "team": "CAR",
+          "score": 30
+        }
+      ]
+    },
+    {
+      "id": "401772888",
+      "date": "2025-11-23T18:00Z",
+      "name": "NYG at DET",
+      "teams": [
+        {
+          "team": "DET",
+          "score": 34
+        },
+        {
+          "team": "NYG",
+          "score": 27
+        }
+      ]
+    },
+    {
+      "id": "401772779",
+      "date": "2025-11-23T18:00Z",
+      "name": "IND at KC",
+      "teams": [
+        {
+          "team": "KC",
+          "score": 23
+        },
+        {
+          "team": "IND",
+          "score": 20
+        }
+      ]
+    },
+    {
+      "id": "401772783",
+      "date": "2025-11-23T21:05Z",
+      "name": "JAX at ARI",
+      "teams": [
+        {
+          "team": "ARI",
+          "score": 24
+        },
+        {
+          "team": "JAX",
+          "score": 27
+        }
+      ]
+    },
+    {
+      "id": "401772931",
+      "date": "2025-12-01T01:20Z",
+      "name": "DEN at WSH",
+      "teams": [
+        {
+          "team": "WSH",
+          "score": 26
+        },
+        {
+          "team": "DEN",
+          "score": 27
+        }
+      ]
+    },
+    {
+      "id": "401772822",
+      "date": "2025-12-09T01:15Z",
+      "name": "PHI at LAC",
+      "teams": [
+        {
+          "team": "LAC",
+          "score": 22
+        },
+        {
+          "team": "PHI",
+          "score": 19
+        }
+      ]
+    },
+    {
+      "id": "401772949",
+      "date": "2025-12-19T01:15Z",
+      "name": "LAR at SEA",
+      "teams": [
+        {
+          "team": "SEA",
+          "score": 38
+        },
+        {
+          "team": "LAR",
+          "score": 37
+        }
+      ]
+    },
+    {
+      "id": "401772613",
+      "date": "2025-12-21T01:20Z",
+      "name": "GB at CHI",
+      "teams": [
+        {
+          "team": "CHI",
+          "score": 22
+        },
+        {
+          "team": "GB",
+          "score": 16
+        }
+      ]
+    }
+  ]
+}

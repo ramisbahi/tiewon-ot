@@ -1,17 +1,18 @@
 import type { BotGame, GameHistory } from './types';
+import type { Probabilities } from '../web/lib/live-probabilities';
 
 export const MILESTONES = [0.20, 0.50, 0.75, 0.90] as const;
 export interface Post {
   key: string;
   gameId: string;
-  kind: 'q4_threshold' | 'ot_threshold' | 'overtime' | 'final' | 'test';
+  kind: 'halftime' | 'q4_threshold' | 'ot_threshold' | 'overtime' | 'final' | 'test';
   text: string;
   probability: number | null;
   milestone?: number;
   replyTo?: string;
 }
 
-export function nextPost(game: BotGame, history: GameHistory, probability: number | null): Post | null {
+export function nextPost(game: BotGame, history: GameHistory, probability: number | null, probabilities?: Probabilities): Post | null {
   if (game.source !== 'live' || game.seasonType === 'preseason' || history.finalized) return null;
   const score = `${game.awayTeam} ${game.awayScore} - ${game.homeTeam} ${game.homeScore}`;
   const hash = `#${game.awayTeam}vs${game.homeTeam} #TieWon`;
@@ -22,6 +23,12 @@ export function nextPost(game: BotGame, history: GameHistory, probability: numbe
   const milestone = crossed.at(-1);
   const crossing = crossed.map((level) => `${Math.round(level * 100)}%`).join(' / ');
   const base = { gameId: game.id, replyTo: history.lastTweetId };
+
+  if (game.isLive && game.status === 'STATUS_HALFTIME' && !history.halftimeAnnounced) {
+    const pct = (p: number | null | undefined) => p == null ? 'unavailable' : `${(p * 100).toFixed(1)}%`;
+    return { ...base, key: `${game.id}:halftime`, kind: 'halftime', probability,
+      text: `HALFTIME.\n\n${score}\nChance of a FINAL TIE: ${pct(probabilities?.finalTie)}\nChance of OVERTIME: ${pct(probabilities?.overtime ?? probability)}\n\nModel estimates for the second half. ${hash}` };
+  }
 
   // Provider-confirmed outcomes override probability and forecast budgets.
   if (!game.isLive) {
