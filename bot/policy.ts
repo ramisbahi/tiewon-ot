@@ -5,7 +5,7 @@ export const MILESTONES = [0.20, 0.50, 0.75, 0.90] as const;
 export interface Post {
   key: string;
   gameId: string;
-  kind: 'halftime' | 'q4_threshold' | 'ot_threshold' | 'overtime' | 'final' | 'test';
+  kind: 'quarter' | 'welcome' | 'halftime' | 'q4_threshold' | 'ot_threshold' | 'overtime' | 'final' | 'test';
   text: string;
   probability: number | null;
   milestone?: number;
@@ -24,23 +24,19 @@ export function nextPost(game: BotGame, history: GameHistory, probability: numbe
   const crossing = crossed.map((level) => `${Math.round(level * 100)}%`).join(' / ');
   const base = { gameId: game.id, replyTo: history.lastTweetId };
 
-  if (game.isLive && game.status === 'STATUS_HALFTIME' && !history.halftimeAnnounced) {
-    const pct = (p: number | null | undefined) => p == null ? 'unavailable' : `${(p * 100).toFixed(1)}%`;
-    return { ...base, key: `${game.id}:halftime`, kind: 'halftime', probability,
-      text: `HALFTIME.\n\n${score}\nChance of a FINAL TIE: ${pct(probabilities?.finalTie)}\nChance of OVERTIME: ${pct(probabilities?.overtime ?? probability)}\n\nModel estimates for the second half. ${hash}` };
-  }
-
   // Provider-confirmed outcomes override probability and forecast budgets.
   if (!game.isLive) {
     if (!isOT && !history.followed) return null;
     const tied = game.awayScore === game.homeScore;
     if (tied && (!isOT || game.seasonType === 'postseason')) return null;
     const winner = game.homeScore > game.awayScore ? game.homeTeam : game.awayTeam;
+    const pct = (p: number | null | undefined) => p == null || !Number.isFinite(p) ? 'unavailable' : `${(p * 100).toFixed(1)}%`;
+    const peaks = `Peak forecasts observed:\nFinal tie: ${pct(history.peakTie)}\nOT (before OT): ${pct(history.peakOvertime)}`;
     const text = tied
-      ? `IT'S A TIE.\n\n${score}\nFinal / OT. No winner. TieWon.\n\n${hash}`
+      ? `IT'S A TIE.\n\n${score}\nFinal / OT. No winner. TieWon.\n\n${peaks}\n\n${hash}`
       : isOT
-        ? `TIE WATCH OVER.\n\n${score}\n${winner} wins in overtime.\n\n${hash}`
-        : `NO OVERTIME.\n\n${score}\nFinal. ${winner} closes it out in regulation.\n\n${hash}`;
+        ? `TIE WATCH OVER.\n\n${score}\n${winner} wins in overtime.\n\n${peaks}\n\n${hash}`
+        : `NO OVERTIME.\n\n${score}\nFinal. ${winner} closes it out in regulation.\n\n${peaks}\n\n${hash}`;
     return { ...base, key: `${game.id}:final`, kind: 'final', probability: tied ? 1 : 0, text };
   }
 
@@ -51,7 +47,18 @@ export function nextPost(game: BotGame, history: GameHistory, probability: numbe
         ? `Chance of a FINAL TIE: ${percent}\nSimulation estimate.${milestone ? ` Above ${crossing}.` : ''}`
         : 'Now watching for a final tie.';
     return { ...base, key: `${game.id}:overtime`, kind: 'overtime', probability: validProbability ? probability : null, milestone,
-      text: `OVERTIME!\n\n${game.awayTeam} vs ${game.homeTeam} went the distance. Regulation ended tied.\n\n${watch}\n\n${hash}` };
+      text: `🚨🚨🚨 ‼️ NUCLEAR TieWatch 🇹🇭⌚️ ‼️ 🚨🚨🚨\n\nOVERTIME! End of Q4.\n${score}\n\n${watch}\n\n${hash}` };
+  }
+  const update = history.quarterUpdate ?? (game.status === 'STATUS_HALFTIME' && !history.halftimeAnnounced
+    ? { quarter: 2, game, probabilities: probabilities ?? { overtime: probability, finalTie: null }, boundary: true } : undefined);
+  if (!isOT && update) {
+    const pct = (p: number | null) => p == null || !Number.isFinite(p) ? 'unavailable' : `${(p * 100).toFixed(1)}%`;
+    const g = update.game;
+    const heading = update.quarter === 2 ? 'HALFTIME / END OF Q2' : `END OF Q${update.quarter}`;
+    const timing = update.boundary ? '' : `\nLatest: Q${g.quarter} ${g.clockLabel} (break missed).`;
+    return { ...base, key: update.quarter === 2 ? `${game.id}:halftime` : `${game.id}:quarter:${update.quarter}`,
+      kind: update.quarter === 2 ? 'halftime' : 'quarter', probability: update.probabilities.overtime,
+      text: `${heading}\n\n${g.awayTeam} ${g.awayScore} - ${g.homeTeam} ${g.homeScore}${timing}\nChance of a FINAL TIE: ${pct(update.probabilities.finalTie)}\nChance of OVERTIME: ${pct(update.probabilities.overtime)}\n\nModel estimates. ${hash}` };
   }
   if (!validProbability || !milestone || game.clockSeconds <= 0 || game.phase !== 'scrimmage' || game.fieldStateReliable === false) return null;
   if (!isOT && (game.quarter !== 4 || history.overtimeAnnounced)) return null;

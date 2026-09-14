@@ -16,7 +16,8 @@
     "bot:test-post": "npm run bot -- --test-post",
     "bot:status": "npm run bot -- --status",
     "bot:resolve": "npm run bot -- --resolve",
-    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next"
+    "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
+    "bot:welcome": "npm run bot -- --welcome-post"
   },
   "dependencies": {
     "drizzle-orm": "^0.45.2",

@@ -3,7 +3,12 @@ import { liveProbabilities, type Probabilities } from '../web/lib/live-probabili
 import type { BotConfig } from './config';
 import { nextPost, type Post } from './policy';
 import { Store } from './store';
-import { XError } from './x-client';
+import { XError, validatePostText } from './x-client';
+
+export const WELCOME_POST: Post = {
+  key: 'account-welcome:v1', gameId: 'account-welcome', kind: 'welcome', probability: null,
+  text: 'Welcome to TieWon! 🏈 We track NFL overtime and final-tie chances, with probability charts and game history. Rooting for the rarest result: nobody wins. 🚨 TieWatch 🇹🇭⌚️\n\nExplore: https://tiewon.sbahirami.chatgpt.site #TieWon',
+};
 
 export const CONNECTION_TEST: Post = {
   key: 'account-test:connection', gameId: 'account-test', kind: 'test', probability: 0,
@@ -11,6 +16,7 @@ export const CONNECTION_TEST: Post = {
 };
 
 export async function publishPost(candidate: Post, store: Store, config: BotConfig, post: (text: string, replyTo?: string) => Promise<string>, now = Date.now(), log: (message: string) => void = console.log) {
+  validatePostText(candidate.text);
   if (!store.claim(candidate, config, now)) return false;
   try {
     const id = config.live ? await post(candidate.text, candidate.replyTo) : `dry-run:${candidate.key}`;
@@ -41,7 +47,7 @@ export async function publishGames(games: BotGame[], store: Store, config: BotCo
     const candidate = nextPost(game, store.gameHistory(game.id), game.quarter > 4 ? probabilities.finalTie : probabilities.overtime, probabilities);
     return candidate ? [candidate] : [];
   });
-  const priority = (p: Post) => p.kind === 'overtime' ? 0 : p.kind === 'final' ? 1 : p.kind === 'halftime' ? 2 : p.kind === 'ot_threshold' ? 3 : 4;
+  const priority = (p: Post) => p.kind === 'overtime' ? 0 : p.kind === 'final' ? 1 : (p.kind === 'halftime' || p.kind === 'quarter') ? 2 : p.kind === 'ot_threshold' ? 3 : 4;
   // Resolve actual outcomes before spending the daily budget on forecasts.
   for (const candidate of candidates.sort((a, b) => priority(a) - priority(b))) {
     // At most three 15-second requests per snapshot; remaining games get a fresh poll.

@@ -41,6 +41,19 @@ export class XError extends Error {
   }
 }
 
+// Conservative upper bound for our templates: non-ASCII code points count as
+// two (emoji sequences may actually cost less). Short URLs need X's 23 chars.
+// This intentionally avoids pretending JS string.length is X's emoji weighting.
+export function postTextWeight(text: string) {
+  const urlsExpanded = text.replace(/https?:\/\/[^\s]+/g, url => url.length < 23 ? 'x'.repeat(23) : url);
+  return Array.from(urlsExpanded.normalize('NFC')).reduce((n, char) => n + (char.codePointAt(0)! <= 0x7f ? 1 : 2), 0);
+}
+export function validatePostText(text: string) {
+  if (!text.trim() || /[\u0000-\u0009\u000b-\u001f\u007f\ufffe\uffff]/u.test(text)
+    || Array.from(text).some(c => c.codePointAt(0)! >= 0xd800 && c.codePointAt(0)! <= 0xdfff)
+    || postTextWeight(text) > 280) throw new Error('Invalid bot post text');
+}
+
 export class XClient {
   constructor(private keys: Credentials, private request: typeof fetch = fetch) {}
 
@@ -73,8 +86,7 @@ export class XClient {
   }
 
   async post(text: string, replyTo?: string) {
-    // Bot templates are deliberately ASCII and URL-free, so this is also X's weighted length.
-    if (!/^[\x20-\x7e\n]+$/.test(text) || text.length > 280) throw new Error('Invalid bot post text');
+    validatePostText(text);
     if (replyTo && !/^\d+$/.test(replyTo)) throw new Error('Invalid reply post ID');
     const result = await this.call('POST', '/2/tweets', { text, ...(replyTo ? { reply: { in_reply_to_tweet_id: replyTo } } : {}) });
     if (typeof result?.data?.id !== 'string') throw new Error('X returned no post ID; delivery may be uncertain');

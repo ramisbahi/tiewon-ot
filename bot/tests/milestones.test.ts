@@ -46,7 +46,7 @@ test('strict milestone crossings, coalescing, no repeat after dips, and self-thr
     assert.equal(sent[0].parent, undefined);
     assert.equal(sent[3].parent, '103');
     assert.equal(await poll(ot, .10), 1);
-    assert.match(sent[4].text, /^OVERTIME!/);
+    assert.match(sent[4].text, /OVERTIME!/);
     assert.equal(await poll(ot, .95), 1);
     assert.match(sent[5].text, /20% \/ 50% \/ 75% \/ 90%/);
     assert.equal(await poll(ot, .95), 0);

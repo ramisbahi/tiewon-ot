@@ -4,7 +4,7 @@ import { readConfig } from './config';
 import { credentials, XClient } from './x-client';
 import { botGames, fetchGames } from './feed';
 import { Store } from './store';
-import { CONNECTION_TEST, publishGames, publishPost } from './engine';
+import { CONNECTION_TEST, WELCOME_POST, publishGames, publishPost } from './engine';
 import { syncHistory } from './history-sync';
 
 process.umask(0o077);
@@ -38,9 +38,9 @@ async function main() {
     }
     const client = config.live ? new XClient(credentials()) : undefined;
     if (client) await client.verifyAccount(config.username);
-    if (command === '--test-post') {
-      const published = await publishPost(CONNECTION_TEST, store, config, (text, replyTo) => client!.post(text, replyTo));
-      console.log(JSON.stringify({ event: 'connection-test', mode: config.live ? 'live' : 'dry-run', published, blocked: store.blocked(Date.now()) }));
+    if (command === '--test-post' || command === '--welcome-post') {
+      const published = await publishPost(command === '--welcome-post' ? WELCOME_POST : CONNECTION_TEST, store, config, (text, replyTo) => client!.post(text, replyTo));
+      console.log(JSON.stringify({ event: command === '--welcome-post' ? 'welcome' : 'connection-test', mode: config.live ? 'live' : 'dry-run', published, blocked: store.blocked(Date.now()) }));
       return;
     }
     console.log(JSON.stringify({ event: 'started', mode: config.live ? 'live' : 'dry-run', account: config.username, pollSeconds: config.pollSeconds }));

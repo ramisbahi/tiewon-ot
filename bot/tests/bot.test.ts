@@ -3,7 +3,7 @@ import test from 'node:test';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { authorization, credentials, XClient, XError } from '../x-client';
+import { postTextWeight, validatePostText, authorization, credentials, XClient, XError } from '../x-client';
 import { readConfig } from '../config';
 import { botGames, fetchGames } from '../feed';
 import { nextPost } from '../policy';
@@ -117,11 +117,11 @@ test('policy keeps predictions out of early/demo/incomplete states and closes fo
   assert.ok(nextPost(game({ isLive: false, homeScore: 27 }), history, 0));
 });
 
-test('generated forecasts and outcomes fit X ASCII text limits', () => {
+test('generated forecasts and outcomes fit conservative X text limits', () => {
   for (const g of [game(), game({ quarter: 5 }), game({ isLive: false, homeScore: 27 })]) {
     const p = nextPost(g, { ...EMPTY_HISTORY, followed: true }, .95)!;
-    assert.ok(p.text.length <= 280);
-    assert.match(p.text, /^[\x20-\x7e\n]+$/);
+    assert.ok(postTextWeight(p.text) <= 280);
+    assert.doesNotThrow(() => validatePostText(p.text));
   }
 });
 

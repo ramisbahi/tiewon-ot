@@ -5,6 +5,7 @@ import type { BotConfig } from './config';
 import type { Post } from './policy';
 import { EMPTY_HISTORY, type BotGame, type GameHistory } from './types';
 import { snapshot, type Snapshot } from '../web/lib/history';
+import { quarterUpdate } from './quarter-updates';
 import type { Probabilities } from '../web/lib/live-probabilities';
 
 export class Store {
@@ -25,7 +26,9 @@ export class Store {
         probability REAL, state TEXT NOT NULL
       );
       CREATE TABLE IF NOT EXISTS snapshots (id TEXT PRIMARY KEY, observed_at INTEGER NOT NULL, payload TEXT NOT NULL, uploaded INTEGER NOT NULL DEFAULT 0);
-      CREATE INDEX IF NOT EXISTS idx_snapshots_pending ON snapshots(uploaded, observed_at);`);
+      CREATE INDEX IF NOT EXISTS idx_snapshots_pending ON snapshots(uploaded, observed_at);
+      CREATE INDEX IF NOT EXISTS idx_snapshots_game ON snapshots(json_extract(payload, '$.gameId'), observed_at);
+      CREATE TABLE IF NOT EXISTS quarter_updates (game_id TEXT NOT NULL, quarter INTEGER NOT NULL, payload TEXT NOT NULL, PRIMARY KEY(game_id, quarter));`);
     // Upgrade pre-milestone deployments without losing posting history.
     const columns = this.db.prepare('PRAGMA table_info(posts)').all();
     if (!columns.some((column) => column.name === 'milestone')) this.db.exec('ALTER TABLE posts ADD COLUMN milestone REAL NOT NULL DEFAULT 0');
@@ -48,7 +51,7 @@ export class Store {
   }
   gameHistory(gameId: string): GameHistory {
     const rows = this.db.prepare("SELECT kind, milestone, tweet_id FROM posts WHERE game_id=? AND status='sent' ORDER BY created_at, rowid").all(gameId);
-    const history = { ...EMPTY_HISTORY };
+    const history: GameHistory = { ...EMPTY_HISTORY };
     for (const row of rows) {
       history.followed = true;
       if (row.kind === 'q4_threshold') history.q4Milestone = Math.max(history.q4Milestone, Number(row.milestone));
@@ -58,10 +61,26 @@ export class Store {
       if (row.kind === 'final') history.finalized = true;
       if (row.tweet_id && /^\d+$/.test(String(row.tweet_id))) history.lastTweetId = String(row.tweet_id);
     }
+    const update = this.db.prepare(`SELECT q.payload FROM quarter_updates q WHERE q.game_id=?
+      AND NOT EXISTS (SELECT 1 FROM posts p WHERE p.key = q.game_id || CASE WHEN q.quarter=2 THEN ':halftime' ELSE ':quarter:' || q.quarter END AND p.status='sent')
+      ORDER BY q.quarter LIMIT 1`).get(gameId);
+    if (update) history.quarterUpdate = JSON.parse(String(update.payload));
+    // Only live forecasts: exclude known final outcomes and OT's automatic 100%.
+    const peaks = this.db.prepare(`SELECT COUNT(*) AS observed,
+      MAX(CASE WHEN json_type(payload, '$.probabilities.finalTie') IN ('real','integer') THEN json_extract(payload, '$.probabilities.finalTie') END) AS tie,
+      MAX(CASE WHEN json_extract(payload, '$.game.quarter')<=4 AND json_type(payload, '$.probabilities.overtime') IN ('real','integer') THEN json_extract(payload, '$.probabilities.overtime') END) AS ot
+      FROM snapshots WHERE json_extract(payload, '$.gameId')=?
+      AND json_extract(payload, '$.origin')='live' AND json_extract(payload, '$.game.isLive')=1`).get(gameId);
+    history.followed ||= Number(peaks?.observed ?? 0) > 0;
+    history.peakTie = peaks?.tie == null ? null : Number(peaks.tie);
+    history.peakOvertime = peaks?.ot == null ? null : Number(peaks.ot);
     return history;
   }
   observe(game: BotGame, probabilities: Probabilities, now: number) {
     if (game.source !== 'live') return;
+    const previous = this.db.prepare("SELECT payload FROM snapshots WHERE json_extract(payload, '$.gameId')=? ORDER BY observed_at DESC, rowid DESC LIMIT 1").get(game.id);
+    const update = quarterUpdate(game, probabilities, previous ? JSON.parse(String(previous.payload)).game : undefined);
+    if (update) this.db.prepare('INSERT OR IGNORE INTO quarter_updates VALUES (?, ?, ?)').run(game.id, update.quarter, JSON.stringify(update));
     const probability = game.quarter > 4 ? probabilities.finalTie : probabilities.overtime;
     this.db.prepare(`INSERT INTO observations VALUES (?, ?, ?, ?, ?)
       ON CONFLICT(game_id) DO UPDATE SET observed_at=excluded.observed_at, phase=excluded.phase,
@@ -91,9 +110,9 @@ export class Store {
         if (post.kind === 'overtime' && history.overtimeAnnounced) return false;
         if (post.kind === 'halftime' && history.halftimeAnnounced) return false;
         // Outcome alerts have reserved access: forecast volume must never suppress OT/finals.
-        if (!['halftime', 'overtime', 'final'].includes(post.kind)) {
+        if (!['quarter', 'halftime', 'overtime', 'final'].includes(post.kind)) {
           const dayStart = Math.floor(now / 86400_000) * 86400_000;
-          const daily = Number(this.db.prepare("SELECT COUNT(*) AS n FROM posts WHERE created_at>=? AND status!='rejected' AND kind NOT IN ('halftime','overtime','final')").get(dayStart)!.n);
+          const daily = Number(this.db.prepare("SELECT COUNT(*) AS n FROM posts WHERE created_at>=? AND status!='rejected' AND kind NOT IN ('quarter','halftime','overtime','final')").get(dayStart)!.n);
           if (daily >= config.maxForecastsPerDay) return false;
         }
         // Re-read the parent under the same transaction that claims the send.

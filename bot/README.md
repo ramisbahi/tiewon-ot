@@ -1,3 +1,17 @@
+## Quarter updates and TieWatch
+The worker posts once after Q1, at halftime (Q2), and after Q3 for each observed live game, even with unavailable probabilities or an exhausted forecast budget. The final recap or OT announcement covers Q4. Each update includes both final-tie and overtime chances. Quarter snapshots and send receipts persist in SQLite, including queued updates when several games reach a break together. If polling misses a break but sees a direct quarter transition, the update identifies the current quarter/clock; it does not invent an exact quarter-end forecast or replay every missed quarter after downtime.
+
+Final recaps include the highest **observed live forecast** for a final tie and the highest OT forecast **before OT**. Final 0/100% outcomes and the automatic 100% OT value once overtime starts do not inflate these forecast peaks. These are maxima from the worker's recorded samples, not a claim of complete coverage while the worker was offline. Games observed live receive a recap even if no earlier alert crossed a threshold.
+
+OT entry posts a loud "NUCLEAR TieWatch 🇹🇭⌚️" alert with sirens and the score. Postseason alerts explain that a final tie is impossible. Existing milestone alerts, thread replies, ambiguity handling and duplicate suppression remain in place. Text validation accepts emoji and uses a conservative weighted-length bound.
+
+### Welcome post
+From `web/`, run `npm run bot:welcome` for a dry-run preview. With the existing four OAuth credentials and `BOT_LIVE=true`, the same command sends the welcome once, using the durable live ledger. It verifies the configured account first. The welcome describes TieWon and links to https://tiewon.sbahirami.chatgpt.site. This command does not start the continuous worker.
+
+The welcome must never be sent automatically by tests, builds or deployments. Tests use mocked X requests and no credentials.
+
+---
+
 # @NFL_TieWon live bot
 
 An independent Node worker reuses the website's ESPN adapter and calibrated regulation-tie model. It does not need an open browser or change the website's deployment. Run it on an always-on Docker host with a persistent volume; deploying the website alone does not run this process.
