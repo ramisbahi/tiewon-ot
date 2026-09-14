@@ -209,10 +209,10 @@ h1 { margin: 0; font-size: clamp(45px, 6vw, 82px); line-height: .96; letter-spac
 .history-heading i { display: inline-block; width: 16px; height: 4px; }
 .legend-final { background: #d63424; }
 .legend-ot { background: #3158a8; margin-left: 10px; }
-.history-chart { display: block; width: 100%; height: auto; min-height: 170px; }
+.history-chart { display: block; width: 100%; height: auto; min-height: 170px; cursor: crosshair; touch-action: pan-y; user-select: none; -webkit-user-select: none; }
+.history-chart:focus-visible { outline: 2px solid #3158a8; outline-offset: 4px; border-radius: 4px; }
+.history-scrub-hint { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
 .history-chart text { fill: var(--muted); font-size: 14px; font-family: Arial, sans-serif; }
-.history-slider { display: flex; align-items: center; gap: 14px; font-size: 14px; }
-.history-slider input { flex: 1; min-width: 80px; accent-color: #d63424; }
 .history-readout { display: flex; flex-wrap: wrap; gap: 12px 20px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 14px; }
 .history-note { color: var(--muted); font-size: 14px; line-height: 1.5; }
 .archive-section { margin-top: 40px; }

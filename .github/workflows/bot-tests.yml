@@ -22,3 +22,4 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npx tsc --noEmit -p ../bot/tsconfig.json
+      - run: npx tsc --noEmit -p tsconfig.json
