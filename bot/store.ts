@@ -134,6 +134,9 @@ export class Store {
   failed(key: string, status: 'uncertain' | 'rejected', error: string) {
     this.db.prepare('UPDATE posts SET status=?, error=? WHERE key=?').run(status, error, key);
   }
+  sentPost(key: string) {
+    return this.db.prepare("SELECT tweet_id FROM posts WHERE key=? AND status='sent'").get(key);
+  }
   history() {
     return this.db.prepare('SELECT key, kind, milestone, status, text, tweet_id, error, created_at FROM posts ORDER BY created_at DESC LIMIT 50').all();
   }
