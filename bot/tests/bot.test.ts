@@ -96,13 +96,14 @@ test('feed includes confirmed overtime and finals even without scrimmage details
   assert.equal(botGames({ events: [final] }, now)[0].isLive, false);
 });
 
-test('ESPN cache staleness is rejected and date range spans UTC midnight', async () => {
+test('ESPN current-week request avoids unsupported date ranges and rejects stale cache', async () => {
   let requested = '';
   await assert.rejects(fetchGames(now, (async (url) => {
     requested = String(url);
     return new Response(JSON.stringify({ events: [] }), { headers: { age: '500' } });
   }) as typeof fetch), /stale/);
-  assert.match(requested, /dates=\d{8}-\d{8}/);
+  assert.equal(new URL(requested).searchParams.has('dates'), false);
+  assert.equal(new URL(requested).searchParams.get('limit'), '100');
 });
 
 test('policy keeps predictions out of early/demo/incomplete states and closes followed games', () => {

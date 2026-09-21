@@ -92,8 +92,10 @@ async function getJson(url: string, request: typeof fetch) {
   return response.json();
 }
 export async function fetchGames(now = Date.now(), request: typeof fetch = fetch, capturePregame?: (lines: PregameLine[]) => void): Promise<BotGame[]> {
-  const date = (time: number) => new Date(time).toISOString().slice(0, 10).replaceAll('-', '');
-  const payload = await getJson(`${ESPN_SCOREBOARD_URL}?dates=${date(now - 86400000)}-${date(now)}&limit=100`, request);
+  // ESPN's NFL date-range query returns HTTP 400. The current scoreboard
+  // includes the active week, including games that continue past UTC midnight.
+  // botGames still checks kickoff age and provider status before accepting a game.
+  const payload = await getJson(`${ESPN_SCOREBOARD_URL}?limit=100`, request);
   capturePregame?.(pregameLines(payload, now));
   return Promise.all(botGames(payload, now).map(async game => {
     if (!game.isLive || game.quarter <= 4 || game.seasonType === 'postseason' || !game.fieldStateReliable) return game;
