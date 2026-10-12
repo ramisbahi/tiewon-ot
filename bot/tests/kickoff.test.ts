@@ -40,6 +40,7 @@ test('kickoff and late-Q1 tracking stay silent while pregame history is preserve
 test('tie celebration requires a confirmed regular-season OT final and fits X',()=>{
  const final={...game,quarter:5,isLive:false,status:'STATUS_FINAL',homeScore:100,awayScore:100};
  const p=nextPost(final,{...EMPTY_HISTORY,followed:true,peakTie:null,peakOvertime:null},1)!;
+ assert.equal(p.text.split('🇹🇼').length-1,6);
  assert.match(p.text,/🎉🎉🎉/);assert.match(p.text,/MISSION ACCOMPLISHED/);assert.match(p.text,/TieWatch 🇹🇭⌚️/);validatePostText(p.text);
  assert.equal(nextPost({...final,seasonType:'postseason'},EMPTY_HISTORY,1),null);
  assert.doesNotMatch(nextPost({...final,isLive:true},EMPTY_HISTORY,.1)!.text,/MISSION ACCOMPLISHED/);
