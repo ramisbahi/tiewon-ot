@@ -120,7 +120,7 @@ test('policy keeps predictions out of early/demo/incomplete states and closes fo
 
 test('generated forecasts and outcomes fit conservative X text limits', () => {
   for (const g of [game(), game({ quarter: 5 }), game({ isLive: false, homeScore: 27 })]) {
-    const p = nextPost(g, { ...EMPTY_HISTORY, followed: true, q4Milestone: .90 }, .95)!;
+    const p = nextPost(g, { ...EMPTY_HISTORY, followed: true, q4Milestone: .20 }, .95)!;
     assert.ok(postTextWeight(p.text) <= 280);
     assert.doesNotThrow(() => validatePostText(p.text));
   }
