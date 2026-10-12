@@ -20,7 +20,7 @@ export async function publishPost(candidate: Post, store: Store, config: BotConf
   validatePostText(candidate.text);
   if (!store.claim(candidate, config, now)) return false;
   try {
-    const id = config.live ? await post(candidate.text, candidate.replyTo) : `dry-run:${candidate.key}`;
+    const id = config.live ? await post(candidate.text) : `dry-run:${candidate.key}`;
     store.sent(candidate.key, id);
     log(JSON.stringify({ event: config.live ? 'published' : 'dry-run', key: candidate.key, id, text: candidate.text }));
     return true;

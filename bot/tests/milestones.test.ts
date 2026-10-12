@@ -30,7 +30,7 @@ const base: BotGame = {
 };
 const ot: BotGame = { ...base, quarter: 5, clockSeconds: 600, overtime: { completed: { home: 0, away: 0 }, firstPossession: 'away', source: 'espn-drives' } };
 
-test('strict milestone crossings, coalescing, no repeat after dips, and self-thread replies', async () => {
+test('strict milestone crossings, coalescing, no repeat after dips, and standalone posts', async () => {
   const store = new Store(':memory:', 'live');
   const sent: { text: string; parent?: string }[] = [];
   const post = async (text: string, parent?: string) => { sent.push({ text, parent }); return String(100 + sent.length); };
@@ -44,7 +44,7 @@ test('strict milestone crossings, coalescing, no repeat after dips, and self-thr
     }
     assert.equal(sent.length, 4);
     assert.equal(sent[0].parent, undefined);
-    assert.equal(sent[3].parent, '103');
+    assert.equal(sent[3].parent, undefined);
     assert.equal(await poll(ot, .10), 1);
     assert.match(sent[4].text, /OVERTIME!/);
     assert.equal(await poll(ot, .95), 1);
@@ -52,7 +52,7 @@ test('strict milestone crossings, coalescing, no repeat after dips, and self-thr
     assert.equal(await poll(ot, .95), 0);
     assert.equal(await poll({ ...ot, isLive: false }, 1), 1);
     assert.match(sent[6].text, /IT'S A TIE/);
-    assert.equal(sent[6].parent, '106');
+    assert.equal(sent[6].parent, undefined);
     assert.equal(await poll({ ...ot, isLive: false }, 1), 0);
     assert.equal(await poll(ot, .99), 0);
     assert.equal(store.gameHistory(base.id).finalized, true);

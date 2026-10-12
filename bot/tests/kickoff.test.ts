@@ -24,22 +24,19 @@ test('kickoff uses spread buckets with an honest fallback and zero postseason ti
  assert.match(kickoffEstimate(game,{...line,capturedAt:start+1}).basis,/unavailable/);
  assert.match(kickoffEstimate(game).basis,/unavailable/);
 });
-test('kickoff posts once, bypasses forecasts budget, persists price and joins the game thread',async()=>{
- const store=new Store(':memory:','live');const config={...readConfig({}),live:true,maxForecastsPerDay:0};const sent:{text:string;parent?:string}[]=[];
- const post=async(text:string,parent?:string)=>{validatePostText(text);sent.push({text,parent});return String(800+sent.length);};
- try{
- store.savePregame(pregameLines({events:[event]},now));assert.equal(store.pregame(game.id)?.spread,-2.5);
- assert.equal(await publishGames([game],store,config,post,start,()=>{}),1);
- assert.match(sent[0].text,/KICKOFF/);assert.match(sent[0].text,/0.52%/);assert.match(sent[0].text,/5.24%/);
- assert.equal(await publishGames([game],store,config,post,start+15000,()=>{}),0);
- assert.equal(await publishGames([{...game,clockSeconds:0,status:'STATUS_END_PERIOD'}],store,config,post,start+900000,()=>{}),1);
- assert.equal(sent[1].parent,'801');assert.match(sent[1].text,/END OF Q1/);
+test('kickoff and late-Q1 tracking stay silent while pregame history is preserved',async()=>{
+ const store=new Store(':memory:','live'); const config={...readConfig({}),live:true}; let calls=0;
+ try {
+  store.savePregame(pregameLines({events:[event]},now));
+  assert.equal(store.pregame(game.id)?.spread,-2.5);
+  for(const g of [game,{...game,clockSeconds:450},{...game,clockSeconds:0,status:'STATUS_END_PERIOD'}]){
+   assert.equal(await publishGames([g],store,config,async()=>{calls++;return '801';},start,()=>{}),0);
+   assert.equal(nextPost(g,EMPTY_HISTORY,.1,{overtime:.1,finalTie:.01}),null);
+  }
+  assert.equal(calls,0); assert.ok(store.pendingSnapshots().length>0);
  }finally{store.close();}
 });
-test('joining later in Q1 does not claim a kickoff forecast or invent pregame odds',()=>{
- const post=nextPost({...game,clockSeconds:450,clockLabel:'7:30'},EMPTY_HISTORY,.1,{overtime:.1,finalTie:.01})!;
- assert.match(post.text,/Joined after kickoff/);assert.doesNotMatch(post.text,/KICKOFF!/);validatePostText(post.text);
-});
+
 test('tie celebration requires a confirmed regular-season OT final and fits X',()=>{
  const final={...game,quarter:5,isLive:false,status:'STATUS_FINAL',homeScore:100,awayScore:100};
  const p=nextPost(final,{...EMPTY_HISTORY,followed:true,peakTie:null,peakOvertime:null},1)!;

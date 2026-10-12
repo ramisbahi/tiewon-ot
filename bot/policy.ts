@@ -22,11 +22,11 @@ export function nextPost(game: BotGame, history: GameHistory, probability: numbe
   const crossed = validProbability ? MILESTONES.filter((level) => probability! > level && level > (isOT ? history.otMilestone : history.q4Milestone)) : [];
   const milestone = crossed.at(-1);
   const crossing = crossed.map((level) => `${Math.round(level * 100)}%`).join(' / ');
-  const base = { gameId: game.id, replyTo: history.lastTweetId };
+  const base = { gameId: game.id };
 
   // Provider-confirmed outcomes override probability and forecast budgets.
   if (!game.isLive) {
-    if (!isOT && !history.followed) return null;
+    if (!isOT && history.q4Milestone === 0) return null;
     const tied = game.awayScore === game.homeScore;
     if (tied && (!isOT || game.seasonType === 'postseason')) return null;
     const winner = game.homeScore > game.awayScore ? game.homeTeam : game.awayTeam;
@@ -49,25 +49,7 @@ export function nextPost(game: BotGame, history: GameHistory, probability: numbe
     return { ...base, key: `${game.id}:overtime`, kind: 'overtime', probability: validProbability ? probability : null, milestone,
       text: `🚨🚨🚨 ‼️ NUCLEAR TieWatch 🇹🇭⌚️ ‼️ 🚨🚨🚨\n\nOVERTIME! End of Q4.\n${score}\n\n${watch}\n\n${hash}` };
   }
-  if (game.quarter === 1 && game.status === 'STATUS_IN_PROGRESS' && game.clockSeconds > 0 && !history.kickoffAnnounced) {
-    const p = game.kickoffForecast ?? probabilities;
-    const pct = (v: number | null | undefined) => v == null ? 'unavailable' : `${(v*100).toFixed(2)}%`;
-    const start = game.kickoffForecast ? 'KICKOFF! 🏈 Now tracking' : `NOW TRACKING 🏈 Q1 ${game.clockLabel}`;
-    const basis = game.kickoffForecast ? `Kickoff model: ${game.kickoffForecast.basis}.` : 'Joined after kickoff. Current model estimates.';
-    return { ...base, key: `${game.id}:kickoff`, kind: 'kickoff', probability: p?.finalTie ?? null,
-      text: `${start} ${game.awayTeam} vs ${game.homeTeam}\n\nChance of a FINAL TIE: ${pct(p?.finalTie)}\nChance of OVERTIME: ${pct(p?.overtime)}\n\n${basis}\nTieWatch 🇹🇭⌚️ ${hash}` };
-  }
-  const update = history.quarterUpdate ?? (game.status === 'STATUS_HALFTIME' && !history.halftimeAnnounced
-    ? { quarter: 2, game, probabilities: probabilities ?? { overtime: probability, finalTie: null }, boundary: true } : undefined);
-  if (!isOT && update) {
-    const pct = (p: number | null) => p == null || !Number.isFinite(p) ? 'unavailable' : `${(p * 100).toFixed(1)}%`;
-    const g = update.game;
-    const heading = update.quarter === 2 ? 'HALFTIME / END OF Q2' : `END OF Q${update.quarter}`;
-    const timing = update.boundary ? '' : `\nLatest: Q${g.quarter} ${g.clockLabel} (break missed).`;
-    return { ...base, key: update.quarter === 2 ? `${game.id}:halftime` : `${game.id}:quarter:${update.quarter}`,
-      kind: update.quarter === 2 ? 'halftime' : 'quarter', probability: update.probabilities.overtime,
-      text: `${heading}\n\n${g.awayTeam} ${g.awayScore} - ${g.homeTeam} ${g.homeScore}${timing}\nChance of a FINAL TIE: ${pct(update.probabilities.finalTie)}\nChance of OVERTIME: ${pct(update.probabilities.overtime)}\n\nModel estimates. ${hash}` };
-  }
+  // Kickoff, halftime and quarter updates are intentionally silent.
   if (!validProbability || !milestone || game.clockSeconds <= 0 || game.phase !== 'scrimmage' || game.fieldStateReliable === false) return null;
   if (!isOT && (game.quarter !== 4 || history.overtimeAnnounced)) return null;
   if (isOT && game.seasonType === 'postseason') return null;

@@ -51,18 +51,11 @@ test('OT simulator honors opening, response, sudden death and playoff state',()=
   assert.ok(overtimeScenario({...base,clockSeconds:1},'sudden_death').finalTie!>opening.finalTie!);
   assert.ok(overtimeScenario({...base,clockSeconds:0},'sudden_death').error);
 });
-test('halftime posts bypass forecast limits, survive missing fields, deduplicate and thread',async()=>{
-  const store=new Store(':memory:','live'),config={...readConfig({}),live:true,maxForecastsPerDay:1};
-  const sent:{text:string;parent?:string}[]=[]; const post=async(text:string,parent?:string)=>{sent.push({text,parent});return String(sent.length+100);}; const now=Date.now();
-  try {
-    await publishGames([{...base,quarter:4}],store,config,post,now,()=>{},()=>({overtime:.3,finalTie:.03}));
-    const halftime={...base,id:'401999991',quarter:2,clockSeconds:0,status:'STATUS_HALFTIME',fieldStateReliable:false};
-    const p=liveProbabilities(halftime); assert.ok(p.overtime!>0); assert.equal(p.finalTie,p.overtime!*.1);
-    assert.equal(await publishGames([halftime],store,config,post,now+15000,()=>{}),1);
-    assert.equal(await publishGames([halftime],store,config,post,now+30000,()=>{}),0);
-    assert.match(sent[1].text,/HALFTIME/); assert.match(sent[1].text,/FINAL TIE/); assert.ok(sent[1].text.length<=280);
-    const games=Array.from({length:7},(_,i)=>({...halftime,id:String(401999992+i)}));
-    for(const [i,n] of [3,3,1].entries()) assert.equal(await publishGames(games,store,config,post,now+45000+i*15000,()=>{},()=>({overtime:null,finalTie:null})),n);
-    assert.equal(await publishGames([{...halftime,isLive:false,homeScore:31}],store,config,post,now+90000,()=>{}),1); assert.equal(sent.at(-1)!.parent,'102');
-  } finally {store.close();}
+test('halftime is silent even when forecasts are available',async()=>{
+ const store=new Store(':memory:','live'),config={...readConfig({}),live:true};let calls=0;
+ try{
+  const halftime={...base,id:'401999991',quarter:2,clockSeconds:0,status:'STATUS_HALFTIME',fieldStateReliable:false};
+  assert.equal(await publishGames([halftime],store,config,async()=>{calls++;return '101';},Date.now(),()=>{}),0);
+  assert.equal(calls,0);assert.ok(store.pendingSnapshots().length>0);
+ }finally{store.close();}
 });

@@ -22,46 +22,33 @@ const config = { ...readConfig({}), live:true, maxForecastsPerDay:1 };
 const noop = () => {};
 const low = { overtime:.1, finalTie:.01 };
 
-test('Q1, halftime and Q3 post once across restarts, with both probabilities and final recap', async () => {
-  const dir=mkdtempSync(join(tmpdir(),'tiewon-quarters-')), path=join(dir,'state.sqlite');
-  let store=new Store(path,'live'), now=Date.now();
-  const sent: {text:string; parent?:string}[]=[];
-  const send=async(text:string,parent?:string)=>{sent.push({text,parent}); return String(700+sent.length);};
-  const poll=(g:BotGame,p=low)=>publishGames([g],store,config,send,now+=15000,noop,()=>p);
-  try {
-    assert.equal(await poll(game),1);
-    store.close(); store=new Store(path,'live');
-    assert.equal(await poll(game),0);
-    assert.equal(await poll({...game,quarter:2,status:'STATUS_HALFTIME'}),1);
-    assert.equal(await poll({...game,quarter:3}),1);
-    assert.equal(await poll({...game,quarter:3}),0);
-    // Subthreshold forecasts still contribute to peaks.
-    await poll({...game,quarter:4,clockSeconds:180,status:'STATUS_IN_PROGRESS'}, {overtime:.19,finalTie:.019});
-    assert.equal(await poll({...game,quarter:4,isLive:false,status:'STATUS_FINAL',homeScore:13},{overtime:0,finalTie:0}),1);
-    assert.equal(sent.length,4);
-    assert.match(sent[0].text,/END OF Q1/); assert.match(sent[1].text,/HALFTIME/); assert.match(sent[2].text,/END OF Q3/);
-    assert.match(sent[3].text,/Final tie: 1.9%/); assert.match(sent[3].text,/OT \(before OT\): 19.0%/);
-    assert.equal(sent[3].parent,'703');
-    assert.equal(await poll({...game,quarter:4,isLive:false,status:'STATUS_FINAL',homeScore:13}),0);
-  } finally {store.close();rmSync(dir,{recursive:true});}
+test('quarter updates remain silent across restarts, while snapshots and significant alerts persist',async()=>{
+ const dir=mkdtempSync(join(tmpdir(),'tiewon-quiet-')),path=join(dir,'state.sqlite');
+ let store=new Store(path,'live'),now=Date.now(); const sent:{text:string;parent?:string}[]=[];
+ const send=async(text:string,parent?:string)=>{sent.push({text,parent});return String(700+sent.length);};
+ const poll=(g:BotGame,p=low)=>publishGames([g],store,config,send,now+=15000,noop,()=>p);
+ try {
+  for(const g of [game,{...game,quarter:2,status:'STATUS_HALFTIME'},{...game,quarter:3}]) assert.equal(await poll(g),0);
+  store.close();store=new Store(path,'live');assert.equal(await poll(game),0);
+  const q4={...game,quarter:4,clockSeconds:180,status:'STATUS_IN_PROGRESS',fieldStateReliable:true};
+  assert.equal(await poll(q4,{overtime:.19,finalTie:.019}),0);
+  assert.equal(await poll({...q4,isLive:false,status:'STATUS_FINAL',homeScore:13},{overtime:0,finalTie:0}),0);
+  assert.ok(store.pendingSnapshots().length>0);
+  const watched={...q4,id:'401000222'};
+  assert.equal(await poll(watched,{overtime:.51,finalTie:.051}),1);
+  assert.equal(await poll({...watched,isLive:false,status:'STATUS_FINAL',homeScore:13},{overtime:0,finalTie:0}),1);
+  assert.match(sent[1].text,/Final tie: 5.1%/);assert.match(sent[1].text,/51.0%/);
+  assert.ok(sent.every(p=>p.parent===undefined));
+ }finally{store.close();rmSync(dir,{recursive:true});}
 });
 
-test('queued quarters survive a busy slate and missing break status is labeled honestly',async()=>{
-  const store=new Store(':memory:','live'); let n=0; const send=async()=>String(++n);
-  const now=Date.now();
-  try {
-    const games=Array.from({length:7},(_,i)=>({...game,id:String(401000200+i)}));
-    for(const [i,count] of [3,3,1].entries())
-      assert.equal(await publishGames(games,store,config,send,now+i*15000,noop,()=>({overtime:null,finalTie:null})),count);
-    const previous={...game,id:'401000299',clockSeconds:15,clockLabel:'0:15',status:'STATUS_IN_PROGRESS'};
-    store.observe(previous,low,now);
-    const current={...previous,quarter:2,clockSeconds:895,clockLabel:'14:55'};
-    store.observe(current,low,now+15000);
-    const post=nextPost(current,store.gameHistory(current.id),low.overtime,low)!;
-    assert.match(post.text,/END OF Q1/); assert.match(post.text,/Latest: Q2 14:55 \(break missed\)/);
-    assert.equal(quarterUpdate({...current,quarter:4},low,previous),null);
-    assert.equal(quarterUpdate({...game,source:'demo'},low),null);
-  } finally {store.close();}
+test('old queued quarter updates never block significant Q4 alerts',()=>{
+ const g={...game,quarter:4,clockSeconds:120,status:'STATUS_IN_PROGRESS',fieldStateReliable:true};
+ const history={...EMPTY_HISTORY,lastTweetId:'123',quarterUpdate:{quarter:1,game,probabilities:low,boundary:true}};
+ assert.equal(nextPost({...g,quarter:2,status:'STATUS_HALFTIME'},history,.6),null);
+ assert.equal(nextPost(g,history,.19),null);
+ const alert=nextPost(g,history,.51)!;assert.equal(alert.kind,'q4_threshold');assert.equal(alert.replyTo,undefined);
+ assert.equal(quarterUpdate({...game,source:'demo'},low),null);
 });
 
 test('OT emoji alert works and peaks exclude final outcomes and automatic OT certainty',async()=>{

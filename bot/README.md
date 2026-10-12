@@ -1,9 +1,9 @@
-## Quarter updates and TieWatch
-The worker posts once after Q1, at halftime (Q2), and after Q3 for each observed live game, even with unavailable probabilities or an exhausted forecast budget. The final recap or OT announcement covers Q4. Each update includes both final-tie and overtime chances. Quarter snapshots and send receipts persist in SQLite, including queued updates when several games reach a break together. If polling misses a break but sees a direct quarter transition, the update identifies the current quarter/clock; it does not invent an exact quarter-end forecast or replay every missed quarter after downtime.
+## Significant standalone alerts
+Every post is standalone; the worker never supplies an X reply parent. Kickoff, initial tracking, quarter-end and halftime posts are disabled. Existing receipts and probability snapshots remain intact.
 
-Final recaps include the highest **observed live forecast** for a final tie and the highest OT forecast **before OT**. Final 0/100% outcomes and the automatic 100% OT value once overtime starts do not inflate these forecast peaks. These are maxima from the worker's recorded samples, not a claim of complete coverage while the worker was offline. Games observed live receive a recap even if no earlier alert crossed a threshold.
+Q4 overtime-probability crossings above 20%, 50%, 75%, and 90% still alert once per milestone. A regulation final recap only closes a game that actually triggered a Q4 milestone alert; quiet games stay quiet. OT entry, OT final-tie thresholds, confirmed OT finals and huge tie celebrations are unchanged.
 
-OT entry posts a loud "NUCLEAR TieWatch 🇹🇭⌚️" alert with sirens and the score. Postseason alerts explain that a final tie is impossible. Existing milestone alerts, thread replies, ambiguity handling and duplicate suppression remain in place. Text validation accepts emoji and uses a conservative weighted-length bound.
+Final recaps report peak observed live tie and pre-OT forecasts, excluding known outcomes and automatic OT certainty.
 
 ### Welcome post
 From `web/`, run `npm run bot:welcome` for a dry-run preview. With the existing four OAuth credentials and `BOT_LIVE=true`, the same command sends the welcome once, using the durable live ledger. It verifies the configured account first. The welcome describes TieWon and links to https://tiewon.sbahirami.chatgpt.site. This command does not start the continuous worker.
@@ -19,16 +19,16 @@ An independent Node worker reuses the website's ESPN adapter and calibrated regu
 ## Posting behavior
 
 - Poll ESPN every **15 seconds**, including games crossing UTC midnight.
-- At **halftime**, post the score and both probabilities for every regular/postseason game, once, regardless of thresholds or forecast budget. If forecasts are unavailable, the score update still posts.
+- No kickoff, initial tracking, halftime or quarter-end posts.
 - In **Q4**, alert when the probability of reaching overtime is strictly above **20%, 50%, 75%, 90%**.
 - Announce provider-confirmed **OVERTIME!** once, even without an earlier forecast or complete field data.
 - During regular-season **OT**, switch to the probability of a **final tie**, using the same four milestones. Playoff games cannot finish tied.
-- Post the confirmed final: tie, OT winner, or regulation winner for a game previously followed.
-- Keep each game's updates in one reply chain. Each milestone is sent once per game/phase; a dip and recrossing do not repeat it. A jump over several levels produces one message listing those levels.
-- Forecast budget: 128 per UTC day by default. Halftime and confirmed OT/final posts bypass this budget. X errors, account access, and uncertain delivery can still delay or block any post.
+- Post the confirmed final: tie, OT winner, or regulation winner only after a Q4 milestone alert.
+- Publish every update as a separate standalone post. Each milestone is sent once per game/phase; a dip and recrossing do not repeat it. A jump over several levels produces one message listing those levels.
+- Forecast budget: 128 per UTC day by default. Confirmed OT/final posts bypass this budget. X errors, account access, and uncertain delivery can still delay or block any post.
 - Skip preseason/demo forecasts. Incomplete field data, pending touchdowns/tries, and unconfirmed 0:00 states produce gaps rather than guesses. OT forecasts additionally require a consistent summary drive history.
 
-The maximum natural game sequence is one halftime update, four Q4 forecasts, one OT confirmation, four OT forecasts, and one final; a high opening OT probability can combine milestones into the OT announcement. Games first seen after finishing receive a final only if they reached OT or were previously followed.
+The maximum natural game sequence is four Q4 forecasts, one OT confirmation, four OT forecasts, and one final; a high opening OT probability can combine milestones into the OT announcement. Games first seen after finishing receive a final only if they reached OT or triggered a Q4 milestone alert.
 
 Both probabilities are estimates. Regulation OT probability uses the calibrated historical model. Final-tie probability in regulation multiplies it by a **10% fresh-OT tie rate** for current regular-season rules: the Jeffreys-smoothed estimate `(1 + 0.5) / (14 + 1)` from the full 2025 regular season (272 games, 14 OT games, one tie; raw rate 7.1%). The cohort and source URL are in `web/lib/ot-baseline.json`. The prior season is frozen to prevent hindsight in 2026 backfills. Halftime forecasts average both possible receiving teams at a fresh Q3 kickoff with reset timeouts. In OT, simulation starts at the actual score, clock, field state and completed possessions. A responding OT touchdown against an opening touchdown chooses a two-point try 90% of the time, with conversion success sampled separately from historical try rates. This is a user-specified strategy assumption, not a measured attempt rate. Failed tries can produce a winner; scoreless OT and matching field goals can still end tied when time expires. Current-rule live OT estimates receive a constant odds-intercept adjustment to anchor the old roughly 23% simulated opening rate to the 10% empirical baseline. This small-sample baseline adjustment is **not out-of-sample validation** of live states; the regulation model's validation statistics do not validate final-tie probabilities.
 
@@ -167,7 +167,7 @@ The simulator now exposes Q1/Q2/Q3/Q4/OT. OT offers opening, response and sudden
 Use one always-on service from this branch, repository root `/`, Dockerfile `bot/Dockerfile`, image default start command, and a persistent volume at `/app/.bot-state` writable by UID 1000. Configure four X secrets, `BOT_LIVE=true`, `X_EXPECTED_USERNAME=NFL_TieWon`, `BOT_DATABASE=/app/.bot-state/live.sqlite`, and the history URL/token above. Disable sleeping and use one replica. Preserve the existing ledger when migrating a worker and stop the old copy first. Verify authenticated startup and recurring successful polls in host logs before describing the bot as live. A committed Docker configuration or successful X test does not establish that a worker is deployed.
 
 ## Kickoff and confirmed-tie celebration
-The first in-progress Q1 observation posts a tracking message, once per game and outside the forecast budget. At 0-0 in the first 90 seconds, its kickoff forecast uses an ESPN pregame spread captured before the scheduled start, paired with smoothed 2017-2025 nflverse OT rates by absolute-spread bucket. Quotes are persisted before kickoff and never replaced using an in-game line. If no valid pregame quote was recorded, the post explicitly uses the historical average. Later Q1 joins are labeled as current forecasts, not kickoff estimates. Keep the worker running before kickoff to collect quotes.
+Kickoff estimates are recorded for history but do not trigger tweets. At 0-0 in the first 90 seconds, its kickoff forecast uses an ESPN pregame spread captured before the scheduled start, paired with smoothed 2017-2025 nflverse OT rates by absolute-spread bucket. Quotes are persisted before kickoff and never replaced using an in-game line. If no valid pregame quote was recorded, the post explicitly uses the historical average. There are no late-join tracking posts. Keep the worker running before kickoff to collect quotes.
 
 The fitted dataset has 2,383 regular-season games and 131 OT games. Buckets are <=3, >3 through 7, and >7 points, shrunk toward the league rate with 100 pseudo-games. A 2024-2025 holdout produces Brier 0.052011 versus 0.052106 for the flat rate: a small improvement, not strong calibration evidence. The final-tie forecast multiplies the OT estimate by the existing 10% fresh-OT prior; postseason final tie stays zero. Reproduce with `python modeling/train_pregame.py /path/to/nflverse-games.csv`. Provenance and validation are in `web/lib/pregame-baseline.json`.
 

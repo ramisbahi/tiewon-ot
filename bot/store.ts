@@ -123,8 +123,8 @@ export class Store {
           const daily = Number(this.db.prepare("SELECT COUNT(*) AS n FROM posts WHERE created_at>=? AND status!='rejected' AND kind NOT IN ('kickoff','quarter','halftime','overtime','final')").get(dayStart)!.n);
           if (daily >= config.maxForecastsPerDay) return false;
         }
-        // Re-read the parent under the same transaction that claims the send.
-        post.replyTo = history.lastTweetId;
+        // Preserve receipt history for deduplication, but publish standalone posts.
+        post.replyTo = undefined;
         const inserted = this.db.prepare(`INSERT INTO posts (key, game_id, kind, text, probability, created_at, status, milestone)
           VALUES (?, ?, ?, ?, ?, ?, 'sending', ?) ON CONFLICT(key) DO UPDATE SET status='sending', created_at=excluded.created_at,
           text=excluded.text, probability=excluded.probability, milestone=excluded.milestone, error=NULL
