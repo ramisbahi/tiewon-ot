@@ -33,7 +33,7 @@ export function nextPost(game: BotGame, history: GameHistory, probability: numbe
     const pct = (p: number | null | undefined) => p == null || !Number.isFinite(p) ? 'unavailable' : `${(p * 100).toFixed(1)}%`;
     const peaks = `Peak forecasts observed:\nFinal tie: ${pct(history.peakTie)}\nOT (before OT): ${pct(history.peakOvertime)}`;
     const text = tied
-      ? `🇹🇼🇹🇼🇹🇼 🚨 IT'S A TIE!!! 🚨 🇹🇼🇹🇼🇹🇼\n🎉🎉🎉 NOBODY WINS. TIEWON WINS!\nTieWatch 🇹🇭⌚️: MISSION ACCOMPLISHED\n\n${score} | FINAL / OT\n\n${peaks}\n\n${hash}`
+      ? `🇹🇼🇹🇼🇹🇼 🚨 IT'S A TIE!!! 🚨 🇹🇼🇹🇼🇹🇼\n🎉🎉🎉 NOBODY WINS. TIEWON WINS!\nTIEWON DELIVERED! MISSION ACCOMPLISHED\n\n${score} | FINAL / OT\n\n${peaks}\n\n${hash}`
       : isOT
         ? `TIE WATCH OVER.\n\n${score}\n${winner} wins in overtime.\n\n${peaks}\n\n${hash}`
         : `NO OVERTIME.\n\n${score}\nFinal. ${winner} closes it out in regulation.\n\n${peaks}\n\n${hash}`;
