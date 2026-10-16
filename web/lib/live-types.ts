@@ -1,6 +1,7 @@
 import type { GameState, Possession } from './types';
 
 export interface OvertimeContext {
+  firstDriveOutcome?: 'touchdown' | 'fieldGoal' | 'noScore';
   completed: Record<Possession, number>;
   firstPossession: Possession;
   source: 'espn-drives' | 'scenario';

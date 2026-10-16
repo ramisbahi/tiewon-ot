@@ -81,7 +81,11 @@ export function attachOvertimeContext(game: BotGame, payload: unknown): BotGame 
   if (!Number.isFinite(playClock) || playClock < game.clockSeconds || playClock - game.clockSeconds > 60) return game;
   const completed = { home: 0, away: 0 };
   previous.forEach(d => completed[sideOf(d)!]++);
-  return { ...game, overtime: { completed, firstPossession: first, source: 'espn-drives' } };
+  const result = String(previous[0]?.result ?? '').toUpperCase();
+  const firstDriveOutcome = result === 'TD' || result === 'TOUCHDOWN' ? 'touchdown' as const
+    : result === 'FG' || result === 'FIELD GOAL' ? 'fieldGoal' as const
+    : /^(PUNT|DOWNS|FUMBLE|INTERCEPTION|MISSED FG|MISSED FIELD GOAL|END OF HALF|END OF GAME)$/.test(result) ? 'noScore' as const : undefined;
+  return { ...game, overtime: { completed, firstPossession: first, source: 'espn-drives', ...(firstDriveOutcome ? { firstDriveOutcome } : {}) } };
 }
 
 async function getJson(url: string, request: typeof fetch) {

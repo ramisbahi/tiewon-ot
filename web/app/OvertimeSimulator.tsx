@@ -40,7 +40,7 @@ export default function OvertimeSimulator({ base }: { base: GameState }) {
     </div><aside className="forecast-panel" aria-live="polite"><p className="section-kicker">OT forecast</p><span className="forecast-label">Chance of a final tie</span><strong className="forecast-value">{result ? result.finalTie == null ? '—' : pct(result.finalTie) : '…'}</strong>
       {result?.error && <p role="status">{result.error}</p>}
       <div className="forecast-stats"><div><span>Chance of overtime</span><strong>100%</strong></div><div><span>Fresh OT · new rules baseline</span><strong>{pct(FRESH_OT_TIE_RATE)}</strong></div></div>
-      <p className="forecast-note">{state.overtimeRules === 'postseason' ? 'Playoff games continue until a winner is decided. A final tie is impossible.' : '10,000 simulated futures from this OT state. New-rule estimates start from a 6.5% fresh-OT baseline supplied from an external simulation. Live-state adjustments remain approximate.'}</p>
+      <p className="forecast-note">{state.overtimeRules === 'postseason' ? 'Playoff games continue until a winner is decided. A final tie is impossible.' : '10,000 simulated futures from this OT state. New-rule estimates start from a 7.05% fresh-OT baseline supplied from an external simulation. Opening-drive TD / FG / no-score branches imply average tie chances of 0.2% / 12% / 8%. The clock and field position still change live estimates; these adjustments are approximate.'}</p>
       <p className="forecast-note">A touchdown responding to an opening touchdown assumes a 90% chance of going for two. Conversion success is sampled separately. Scoreless drives and matching field goals can leave the game tied as time runs out.</p>
     </aside></div>
   </section>;

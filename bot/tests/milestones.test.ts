@@ -146,6 +146,7 @@ test('real ESPN GB-DAL final and replayed second OT possession match current ada
   const live: BotGame = { ...game, isLive: true, homeScore: play.homeScore, awayScore: play.awayScore, possession: 'away',
     fieldStateReliable: true, clockSeconds: minutes * 60 + seconds, phase: 'scrimmage' };
   assert.deepEqual(attachOvertimeContext(live, summary).overtime?.completed, { home: 1, away: 0 });
+  assert.equal(attachOvertimeContext(live, summary).overtime?.firstDriveOutcome, 'fieldGoal');
   assert.equal(attachOvertimeContext({ ...live, awayScore: 99 }, summary).overtime, undefined);
   assert.equal(attachOvertimeContext({ ...live, clockSeconds: 1 }, summary).overtime, undefined);
   summary.drives.previous = [];

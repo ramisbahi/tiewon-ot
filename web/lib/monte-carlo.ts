@@ -1,5 +1,5 @@
 import simulationData from './simulation-data.json';
-import { resolveOvertimeDrive, type OTFrame } from './ot-model';
+import { resolveOvertimeDrive, sampleFreshOvertimeTie, type OTFrame } from './ot-model';
 import type { GameState, Possession } from './types';
 
 type DriveResult = 'Touchdown' | 'Field goal' | 'Safety' | 'Opp touchdown' | 'No score';
@@ -85,6 +85,9 @@ function overtimeOutcome(
   rules: GameState['overtimeRules'],
   random: () => number,
 ): 'home' | 'away' | 'tie' {
+  // Regulation simulation reaches a fresh OT, so use the supplied branch mixture.
+  // No team-strength inputs are available: conditional on a winner, split evenly.
+  if (rules === 'current_regular') return sampleFreshOvertimeTie(random) ? 'tie' : random() < 0.5 ? 'home' : 'away';
   const frame: OTFrame = { scores, offense: random() < 0.5 ? 'home' : 'away', completed: { home: 0, away: 0 } };
   let seconds = rules === 'postseason' ? 900 : 600;
   let periods = 0;

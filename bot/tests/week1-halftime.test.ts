@@ -39,8 +39,8 @@ test('OT replay uses pre-play scores, midfield and prior possessions without hin
 });
 test('simulation calibration preserves the historical cohort and updates regulation forecasts',()=>{
   assert.equal(baseline.completedGames,272); assert.equal(baseline.games.length,14);
-  assert.equal(baseline.games.filter(g=>g.teams[0].score===g.teams[1].score).length,1); assert.equal(FRESH_OT_TIE_RATE,.065);
-  const p=liveProbabilities({...base,quarter:4,clockSeconds:120}); assert.ok(Math.abs(p.finalTie!/p.overtime!-.065)<1e-10);
+  assert.equal(baseline.games.filter(g=>g.teams[0].score===g.teams[1].score).length,1); assert.equal(FRESH_OT_TIE_RATE,(.215*.002+.182*.12+.60*.08)/.997);
+  const p=liveProbabilities({...base,quarter:4,clockSeconds:120}); assert.ok(Math.abs(p.finalTie!/p.overtime!-FRESH_OT_TIE_RATE)<1e-10);
 });
 test('OT simulator honors opening, response, sudden death and playoff state',()=>{
   const opening=overtimeScenario(base,'opening'); assert.ok(opening.finalTie!>.05 && opening.finalTie!<.08);

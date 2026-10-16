@@ -1,8 +1,12 @@
 {
-  "version": "external-simulation-2026-10-16-v1",
-  "freshOvertimeTieRate": 0.065,
+  "version": "external-drive-branches-2026-10-16-v2",
+  "firstDrive": {
+    "touchdown": { "probability": 0.215, "tieGivenOutcome": 0.002 },
+    "fieldGoal": { "probability": 0.182, "tieGivenOutcome": 0.12 },
+    "noScore": { "probability": 0.60, "tieGivenOutcome": 0.08 }
+  },
   "rules": "current_regular",
   "source": "User-provided result from a friend's simulation model",
   "independentlyVerified": false,
-  "notes": "6.5% at the start of a fresh 10-minute regular-season overtime. External model code and assumptions were not supplied. Historical counts remain in ot-baseline.json; existing recorded forecasts are not rewritten."
+  "notes": "Opening outcome weights total 99.7% and are normalized to 100%. Their weighted conditional tie rates imply 7.0481444333% at fresh OT. Branch rates are averages, not fixed live-state probabilities. External model code and assumptions were not supplied. Historical counts and recorded forecasts are unchanged."
 }

@@ -3,8 +3,20 @@ import calibration from './ot-calibration.json';
 import type { Possession } from './types';
 import type { BotGame, OvertimeContext } from './live-types';
 
-export const OT_MODEL_VERSION = `${data.version}-live-ot-v4-${calibration.version}`;
-export const FRESH_OT_TIE_RATE = calibration.freshOvertimeTieRate;
+export const OT_MODEL_VERSION = `${data.version}-live-ot-v5-${calibration.version}`;
+export const FIRST_DRIVE_BRANCHES = calibration.firstDrive;
+type Branch = keyof typeof FIRST_DRIVE_BRANCHES;
+const branches = Object.keys(FIRST_DRIVE_BRANCHES) as Branch[];
+const branchTotal = branches.reduce((n, b) => n + FIRST_DRIVE_BRANCHES[b].probability, 0);
+export const FRESH_OT_TIE_RATE = branches.reduce((n, b) => n + FIRST_DRIVE_BRANCHES[b].probability * FIRST_DRIVE_BRANCHES[b].tieGivenOutcome, 0) / branchTotal;
+export function sampleFreshOvertimeTie(random: () => number): boolean {
+  let cursor = random() * branchTotal;
+  for (const branch of branches) {
+    cursor -= FIRST_DRIVE_BRANCHES[branch].probability;
+    if (cursor <= 0) return random() < FIRST_DRIVE_BRANCHES[branch].tieGivenOutcome;
+  }
+  return random() < FIRST_DRIVE_BRANCHES.noScore.tieGivenOutcome;
+}
 // User-specified strategy assumption, not a measured historical attempt rate.
 export const OT_RESPONSE_TWO_POINT_RATE = 0.90;
 type Outcome = 'Touchdown' | 'Field goal' | 'Safety' | 'Opp touchdown' | 'No score';
@@ -51,6 +63,7 @@ export function resolveOvertimeDrive(frame: OTFrame, result: Outcome, rules: Bot
 }
 
 function drawOnce(game: BotGame, context: OvertimeContext, random: () => number) {
+  let branch = observedFirstDrive(game);
   const frame: OTFrame = { scores: { home: game.homeScore, away: game.awayScore }, completed: { ...context.completed }, offense: game.possession };
   let seconds = game.clockSeconds;
   let own = game.yardlineOwn;
@@ -77,14 +90,27 @@ function drawOnce(game: BotGame, context: OvertimeContext, random: () => number)
     duration = Math.max(3, Math.round(duration));
     // A play begun before 0:00 can score after the clock expires. Allow the
     // sampled final play a five-second overrun instead of guaranteeing a tie.
-    if (duration > seconds + 5) break;
+    if (duration > seconds + 5) { if (frame.completed.home + frame.completed.away === 0) branch = 'noScore'; break; }
     seconds = Math.max(0, seconds - duration);
-    if (resolveOvertimeDrive(frame, result, game.overtimeRules, random)) return false;
+    if (frame.completed.home + frame.completed.away === 0) branch = result === 'Touchdown' ? 'touchdown' : result === 'Field goal' ? 'fieldGoal' : 'noScore';
+    if (resolveOvertimeDrive(frame, result, game.overtimeRules, random)) return { tied: false, branch };
     own = 30;
     first = false;
   }
   // Regular-season time expires even during the second team's initial possession.
-  return frame.scores.home === frame.scores.away;
+  return { tied: frame.scores.home === frame.scores.away, branch };
+}
+
+// Score difference identifies the opening result only before the responder scores.
+// Once both teams have possessed, use the provider's explicit opening-drive result.
+function observedFirstDrive(game: BotGame): Branch | undefined {
+  const context = game.overtime;
+  if (!context) return undefined;
+  if (context.firstDriveOutcome) return context.firstDriveOutcome;
+  if (context.completed.home + context.completed.away !== 1 || context.completed[game.possession] !== 0) return undefined;
+  const first = context.firstPossession;
+  const lead = first === 'home' ? game.homeScore - game.awayScore : game.awayScore - game.homeScore;
+  return lead >= 6 && lead <= 8 ? 'touchdown' : lead === 3 ? 'fieldGoal' : lead === 0 ? 'noScore' : undefined;
 }
 
 export function predictRawFinalTie(game: BotGame, runs = 10000): number | null {
@@ -97,22 +123,57 @@ export function predictRawFinalTie(game: BotGame, runs = 10000): number | null {
     game.down, game.distance, game.yardlineOwn, game.timeoutsHome, game.timeoutsAway, game.overtime, game.overtimeRules]);
   const random = randomFor(seed);
   let ties = 0;
-  for (let run = 0; run < runs; run++) if (drawOnce(game, game.overtime, random)) ties++;
+  for (let run = 0; run < runs; run++) if (drawOnce(game, game.overtime, random).tied) ties++;
   return ties / runs;
 }
 
-let rawOpeningRate: number | undefined;
+type Cells = Record<Branch, { tie: number; win: number }>;
+let reference: { weights: Cells; rawRate: number } | undefined;
+function referenceCalibration(game: BotGame) {
+  if (reference) return reference;
+  const opening: BotGame = { ...game, id: 'ot-calibration-reference', homeScore: 0, awayScore: 0,
+    quarter: 5, clockSeconds: 600, possession: 'home', down: 1, distance: 10, yardlineOwn: 30,
+    timeoutsHome: 2, timeoutsAway: 2, phase: 'scrimmage', isLive: true, fieldStateReliable: true,
+    overtimeRules: 'current_regular', seasonType: 'regular',
+    overtime: { completed: { home: 0, away: 0 }, firstPossession: 'home', source: 'scenario' } };
+  const counts: Cells = { touchdown: { tie: 0, win: 0 }, fieldGoal: { tie: 0, win: 0 }, noScore: { tie: 0, win: 0 } };
+  const random = randomFor(`${OT_MODEL_VERSION}:reference`), samples = 100000;
+  for (let i = 0; i < samples; i++) {
+    const path = drawOnce(opening, opening.overtime!, random);
+    counts[path.branch!][path.tied ? 'tie' : 'win']++;
+  }
+  const weights = {} as Cells;
+  for (const b of branches) {
+    if (!counts[b].tie || !counts[b].win) throw new Error('OT calibration has insufficient branch support');
+    const target = FIRST_DRIVE_BRANCHES[b], mass = target.probability / branchTotal;
+    weights[b] = { tie: mass * target.tieGivenOutcome / (counts[b].tie / samples),
+      win: mass * (1 - target.tieGivenOutcome) / (counts[b].win / samples) };
+  }
+  reference = { weights, rawRate: branches.reduce((n, b) => n + counts[b].tie, 0) / samples };
+  return reference;
+}
+
 export function predictFinalTie(game: BotGame, runs = 10000): number | null {
   const raw = predictRawFinalTie(game, runs);
   if (raw == null || raw === 0 || raw === 1 || game.overtimeRules !== 'current_regular' || !game.isLive) return raw;
-  if (rawOpeningRate === undefined) {
-    rawOpeningRate = predictRawFinalTie({ ...game, id: 'ot-start-baseline', homeScore: 0, awayScore: 0,
-      quarter: 5, clockSeconds: 600, possession: 'home', down: 1, distance: 10, yardlineOwn: 30,
-      timeoutsHome: 2, timeoutsAway: 2, phase: 'scrimmage', isLive: true, fieldStateReliable: true,
-      overtime: { completed: { home: 0, away: 0 }, firstPossession: 'home', source: 'scenario' } }, 10000)!;
+  const ref = referenceCalibration(game);
+  const completed = game.overtime!.completed.home + game.overtime!.completed.away;
+  if (completed > 0 && !observedFirstDrive(game)) {
+    // Older snapshots/manual sudden-death scenarios may lack opening-drive history.
+    const factor = FRESH_OT_TIE_RATE / (1 - FRESH_OT_TIE_RATE) * (1 - ref.rawRate) / ref.rawRate;
+    return raw * factor / (1 - raw + raw * factor);
   }
-  // A single odds-intercept adjustment anchors the state model to the configured
-  // simulation baseline. This is not independent validation of live-state predictions.
-  const factor = FRESH_OT_TIE_RATE / (1 - FRESH_OT_TIE_RATE) * (1 - rawOpeningRate) / rawOpeningRate;
-  return raw * factor / (1 - raw + raw * factor);
+  // Importance-weight complete futures by (opening outcome, final result).
+  // At fresh OT this matches all supplied joint branch probabilities. Later,
+  // remaining time/field state still change the available simulated futures.
+  const random = randomFor(JSON.stringify([OT_MODEL_VERSION, game.id, game.clockSeconds, game.homeScore, game.awayScore,
+    game.possession, game.down, game.distance, game.yardlineOwn, game.timeoutsHome, game.timeoutsAway, game.overtime]));
+  let tieWeight = 0, totalWeight = 0;
+  for (let i = 0; i < runs; i++) {
+    const path = drawOnce(game, game.overtime!, random);
+    const weight = ref.weights[path.branch!][path.tied ? 'tie' : 'win'];
+    totalWeight += weight;
+    if (path.tied) tieWeight += weight;
+  }
+  return tieWeight / totalWeight;
 }
