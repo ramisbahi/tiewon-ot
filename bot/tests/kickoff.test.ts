@@ -18,7 +18,7 @@ test('only explicitly pregame, finite, timely spreads are accepted',()=>{
 });
 test('kickoff uses spread buckets with an honest fallback and zero postseason tie chance',()=>{
  const line=pregameLines({events:[event]},now)[0]; const p=kickoffEstimate(game,line);
- assert.ok(p.overtime>.05&&p.overtime<.06);assert.equal(p.finalTie,p.overtime*.1);
+ assert.ok(p.overtime>.05&&p.overtime<.06);assert.equal(p.finalTie,p.overtime*.065);
  assert.equal(kickoffEstimate({...game,seasonType:'postseason'},line).finalTie,0);
  assert.match(kickoffEstimate(game,{...line,homeTeam:'DET'}).basis,/unavailable/);
  assert.match(kickoffEstimate(game,{...line,capturedAt:start+1}).basis,/unavailable/);

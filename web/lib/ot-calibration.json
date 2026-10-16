@@ -1,0 +1,8 @@
+{
+  "version": "external-simulation-2026-10-16-v1",
+  "freshOvertimeTieRate": 0.065,
+  "rules": "current_regular",
+  "source": "User-provided result from a friend's simulation model",
+  "independentlyVerified": false,
+  "notes": "6.5% at the start of a fresh 10-minute regular-season overtime. External model code and assumptions were not supplied. Historical counts remain in ot-baseline.json; existing recorded forecasts are not rewritten."
+}

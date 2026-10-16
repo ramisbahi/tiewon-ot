@@ -37,13 +37,13 @@ test('OT replay uses pre-play scores, midfield and prior possessions without hin
   for(const p of all) if(Number(p.sequenceNumber)>cutoff) p.homeScore=55;
   assert.deepEqual(reconstructSummary(raw,1234).find(s=>s.playId==='4018729235164'),find('4018729235164'));
 });
-test('new-rule baseline uses the complete prior regular season and explicit smoothing',()=>{
+test('simulation calibration preserves the historical cohort and updates regulation forecasts',()=>{
   assert.equal(baseline.completedGames,272); assert.equal(baseline.games.length,14);
-  assert.equal(baseline.games.filter(g=>g.teams[0].score===g.teams[1].score).length,1); assert.equal(FRESH_OT_TIE_RATE,.1);
-  const p=liveProbabilities({...base,quarter:4,clockSeconds:120}); assert.ok(Math.abs(p.finalTie!/p.overtime!-.1)<1e-10);
+  assert.equal(baseline.games.filter(g=>g.teams[0].score===g.teams[1].score).length,1); assert.equal(FRESH_OT_TIE_RATE,.065);
+  const p=liveProbabilities({...base,quarter:4,clockSeconds:120}); assert.ok(Math.abs(p.finalTie!/p.overtime!-.065)<1e-10);
 });
 test('OT simulator honors opening, response, sudden death and playoff state',()=>{
-  const opening=overtimeScenario(base,'opening'); assert.ok(opening.finalTie!>.07 && opening.finalTie!<.13);
+  const opening=overtimeScenario(base,'opening'); assert.ok(opening.finalTie!>.05 && opening.finalTie!<.08);
   assert.equal(opening.game.source,'demo'); assert.ok(overtimeScenario({...base,homeScore:27},'opening').error);
   const response=overtimeScenario({...base,homeScore:27,possession:'away',clockSeconds:180},'response');
   assert.deepEqual(response.game.overtime?.completed,{home:1,away:0}); assert.ok(response.finalTie != null);

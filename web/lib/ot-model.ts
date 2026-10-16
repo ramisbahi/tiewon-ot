@@ -1,10 +1,10 @@
 import data from './simulation-data.json';
-import baseline from './ot-baseline.json';
+import calibration from './ot-calibration.json';
 import type { Possession } from './types';
 import type { BotGame, OvertimeContext } from './live-types';
 
-export const OT_MODEL_VERSION = `${data.version}-live-ot-v3`;
-export const FRESH_OT_TIE_RATE = (baseline.ties + baseline.smoothing.alpha) / (baseline.overtimeGames + baseline.smoothing.alpha + baseline.smoothing.beta);
+export const OT_MODEL_VERSION = `${data.version}-live-ot-v4-${calibration.version}`;
+export const FRESH_OT_TIE_RATE = calibration.freshOvertimeTieRate;
 // User-specified strategy assumption, not a measured historical attempt rate.
 export const OT_RESPONSE_TWO_POINT_RATE = 0.90;
 type Outcome = 'Touchdown' | 'Field goal' | 'Safety' | 'Opp touchdown' | 'No score';
@@ -111,8 +111,8 @@ export function predictFinalTie(game: BotGame, runs = 10000): number | null {
       timeoutsHome: 2, timeoutsAway: 2, phase: 'scrimmage', isLive: true, fieldStateReliable: true,
       overtime: { completed: { home: 0, away: 0 }, firstPossession: 'home', source: 'scenario' } }, 10000)!;
   }
-  // A single odds-intercept adjustment anchors the state model to prior-season OT
-  // results. This is not out-of-sample validation of its within-OT predictions.
+  // A single odds-intercept adjustment anchors the state model to the configured
+  // simulation baseline. This is not independent validation of live-state predictions.
   const factor = FRESH_OT_TIE_RATE / (1 - FRESH_OT_TIE_RATE) * (1 - rawOpeningRate) / rawOpeningRate;
   return raw * factor / (1 - raw + raw * factor);
 }
